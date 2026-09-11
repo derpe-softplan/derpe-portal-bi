@@ -1,9 +1,17 @@
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Clock, Database } from "lucide-react";
 import { portalApi } from "../../services/api";
+import { resolvePanelBySlug } from "../../panels/registry";
+
+function CellValue({ value }: { value: unknown }) {
+  return <span>{value === null || value === undefined ? "" : String(value)}</span>;
+}
 
 export default function ReportPage() {
   const { slug } = useParams<{ slug: string }>();
+
+  const Panel = resolvePanelBySlug(slug);
 
   const { data: meta } = useQuery({
     queryKey: ["report-meta", slug],
@@ -15,69 +23,82 @@ export default function ReportPage() {
     queryKey: ["report-data", slug],
     queryFn: () => portalApi.getReportData(slug!).then((r) => r.data),
     enabled: !!slug,
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-gov-blue border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="card p-8 text-center text-red-600">
-        Erro ao carregar o relatório.
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">{meta?.title}</h1>
-        {meta?.description && (
-          <p className="text-sm text-gray-500 mt-1">{meta.description}</p>
+    <div className="px-4 lg:px-8 py-5">
+      {/* Header */}
+      <div className="mb-5">
+        <h1 className="text-xl font-bold text-gray-900 leading-tight">
+          {meta?.title ?? "Carregando..."}
+        </h1>
+        {meta?.last_refreshed_at && (
+          <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+            <Clock size={11} />
+            Atualizado em{" "}
+            {new Date(meta.last_refreshed_at).toLocaleString("pt-BR")}
+          </p>
         )}
       </div>
 
-      {/* Tabela de dados */}
-      {data && data.length > 0 ? (
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  {Object.keys(data[0]).map((col) => (
-                    <th
-                      key={col}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap"
-                    >
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {data.map((row, i) => (
-                  <tr key={i} className="hover:bg-gray-50">
-                    {Object.values(row).map((val, j) => (
-                      <td key={j} className="px-4 py-3 text-gray-800 whitespace-nowrap">
-                        {val === null || val === undefined ? "—" : String(val)}
-                      </td>
+      {/* Loading */}
+      {isLoading && (
+        <div className="flex items-center justify-center h-64 gap-3 text-gray-400">
+          <div className="w-6 h-6 border-2 border-gov-blue border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Carregando dados...</span>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="card p-8 text-center">
+          <Database size={36} className="mx-auto text-amber-400 mb-3" />
+          <p className="text-gray-700 font-medium">Dados não disponíveis</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Este relatório ainda não teve seus dados importados. Aguarde um publicador atualizar.
+          </p>
+        </div>
+      )}
+
+      {/* Panel */}
+      {!isLoading && !error && data && data.length > 0 && (
+        Panel ? (
+          <Panel data={data} />
+        ) : (
+          <div className="card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {Object.keys(data[0]).map((col) => (
+                      <th
+                        key={col}
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap"
+                      >
+                        {col}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {data.map((row, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      {Object.values(row).map((val, j) => (
+                        <td key={j} className="px-4 py-2.5 text-gray-800 whitespace-nowrap">
+                          <CellValue value={val} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="px-4 py-2 border-t border-gray-100 text-xs text-gray-400">
-            {data.length} registro(s)
-          </div>
-        </div>
-      ) : (
+        )
+      )}
+
+      {!isLoading && !error && data?.length === 0 && (
         <div className="card p-10 text-center text-gray-400">Sem dados para exibir.</div>
       )}
     </div>

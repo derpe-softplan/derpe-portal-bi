@@ -1,20 +1,46 @@
+import json
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
+import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.auth.deps import require_admin, require_publisher
 from app.auth.service import hash_password
 from app.db.models import (
-    Group, Report, ReportPermission, ReportStatus,
+    Group, Report, ReportPermission, ReportSnapshot, ReportStatus,
     User, UserGroup, UserRole,
 )
 from app.db.session import get_db
+from app.superset.client import get_client
 
 router = APIRouter()
+UPLOADS_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "reports"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _save_cover_image(file: UploadFile) -> str:
+    if not file.filename:
+        raise HTTPException(400, "Arquivo de imagem inválido")
+
+    content_type = (file.content_type or "").lower()
+    if not content_type.startswith("image/"):
+        raise HTTPException(400, "A capa do relatório deve ser uma imagem.")
+
+    extension = Path(file.filename).suffix.lower() or ".png"
+    filename = f"{uuid.uuid4().hex}{extension}"
+    save_path = UPLOADS_DIR / filename
+
+    with save_path.open("wb") as destination:
+        while chunk := file.file.read(1024 * 1024):
+            destination.write(chunk)
+
+    return f"/uploads/reports/{filename}"
 
 
 # ── Users ─────────────────────────────────────────────────────────────────────
@@ -136,6 +162,7 @@ async def remove_member(group_id: int, user_id: int, db: AsyncSession = Depends(
 class ReportCreate(BaseModel):
     title: str
     description: Optional[str] = None
+    cover_image_url: Optional[str] = None
     slug: str
     sql_query: str
     chart_config: Optional[str] = None
@@ -144,6 +171,8 @@ class ReportCreate(BaseModel):
 class ReportUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    cover_image_url: Optional[str] = None
+    slug: Optional[str] = None
     sql_query: Optional[str] = None
     chart_config: Optional[str] = None
 
@@ -156,11 +185,14 @@ class ReportOut(BaseModel):
     id: int
     title: str
     description: Optional[str]
+    cover_image_url: Optional[str] = None
     slug: str
     status: str
     created_at: datetime
     updated_at: datetime
     published_at: Optional[datetime]
+    last_refreshed_at: Optional[datetime] = None
+    row_count: Optional[int] = None
     model_config = {"from_attributes": True}
 
 
@@ -176,10 +208,30 @@ class PermissionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+def _report_to_dict(r: Report) -> dict:
+    return {
+        "id": r.id,
+        "title": r.title,
+        "description": r.description,
+        "cover_image_url": r.cover_image_url,
+        "slug": r.slug,
+        "status": r.status,
+        "created_at": r.created_at,
+        "updated_at": r.updated_at,
+        "published_at": r.published_at,
+        "last_refreshed_at": r.snapshot.refreshed_at if r.snapshot else None,
+        "row_count": r.snapshot.row_count if r.snapshot else None,
+    }
+
+
 @router.get("/reports", response_model=list[ReportOut])
 async def list_reports(db: AsyncSession = Depends(get_db), _=Depends(require_publisher)):
-    result = await db.execute(select(Report).order_by(Report.created_at.desc()))
-    return result.scalars().all()
+    result = await db.execute(
+        select(Report)
+        .options(selectinload(Report.snapshot))
+        .order_by(Report.created_at.desc())
+    )
+    return [_report_to_dict(r) for r in result.scalars().all()]
 
 
 @router.post("/reports", response_model=ReportOut, status_code=201)
@@ -192,12 +244,19 @@ async def create_report(
     db.add(report)
     await db.commit()
     await db.refresh(report)
-    return report
+    return _report_to_dict(report)
 
 
 @router.put("/reports/{report_id}", response_model=ReportOut)
-async def update_report(report_id: int, body: ReportUpdate, db: AsyncSession = Depends(get_db), _=Depends(require_publisher)):
-    result = await db.execute(select(Report).where(Report.id == report_id))
+async def update_report(
+    report_id: int,
+    body: ReportUpdate,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_publisher),
+):
+    result = await db.execute(
+        select(Report).options(selectinload(Report.snapshot)).where(Report.id == report_id)
+    )
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(404, "Relatório não encontrado")
@@ -205,7 +264,7 @@ async def update_report(report_id: int, body: ReportUpdate, db: AsyncSession = D
         setattr(report, field, value)
     await db.commit()
     await db.refresh(report)
-    return report
+    return _report_to_dict(report)
 
 
 @router.patch("/reports/{report_id}/status", response_model=ReportOut)
@@ -213,19 +272,98 @@ async def change_status(
     report_id: int,
     body: StatusChange,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_publisher),
 ):
-    result = await db.execute(select(Report).where(Report.id == report_id))
+    result = await db.execute(
+        select(Report).options(selectinload(Report.snapshot)).where(Report.id == report_id)
+    )
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(404, "Relatório não encontrado")
+    # Arquivar exige admin
+    if body.status == ReportStatus.archived and current_user.role != UserRole.admin:
+        raise HTTPException(403, "Apenas administradores podem arquivar relatórios")
     report.status = body.status
     if body.status == ReportStatus.published:
         report.published_at = datetime.utcnow()
         report.reviewed_by_id = current_user.id
     await db.commit()
     await db.refresh(report)
-    return report
+    return _report_to_dict(report)
+
+
+@router.post("/reports/{report_id}/cover", response_model=ReportOut)
+async def upload_report_cover(
+    report_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_publisher),
+):
+    result = await db.execute(select(Report).options(selectinload(Report.snapshot)).where(Report.id == report_id))
+    report = result.scalar_one_or_none()
+    if not report:
+        raise HTTPException(404, "Relatório não encontrado")
+
+    cover_url = _save_cover_image(file)
+    report.cover_image_url = cover_url
+    await db.commit()
+    await db.refresh(report)
+    return _report_to_dict(report)
+
+
+@router.post("/reports/{report_id}/refresh")
+async def refresh_snapshot(
+    report_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_publisher),
+):
+    result = await db.execute(select(Report).where(Report.id == report_id))
+    report = result.scalar_one_or_none()
+    if not report:
+        raise HTTPException(404, "Relatório não encontrado")
+
+    data = await get_client().query(report.sql_query)
+    clean_data = json.loads(json.dumps(data, default=str))
+
+    snap_result = await db.execute(
+        select(ReportSnapshot).where(ReportSnapshot.report_id == report_id)
+    )
+    snapshot = snap_result.scalar_one_or_none()
+    if snapshot:
+        snapshot.data = clean_data
+        snapshot.row_count = len(clean_data)
+        snapshot.refreshed_at = datetime.utcnow()
+        snapshot.refreshed_by_id = current_user.id
+    else:
+        snapshot = ReportSnapshot(
+            report_id=report_id,
+            data=clean_data,
+            row_count=len(clean_data),
+            refreshed_by_id=current_user.id,
+        )
+        db.add(snapshot)
+
+    await db.commit()
+    await db.refresh(snapshot)
+    return {
+        "refreshed_at": snapshot.refreshed_at,
+        "row_count": snapshot.row_count,
+    }
+
+
+@router.get("/reports/{report_id}/data")
+async def preview_snapshot(
+    report_id: int,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_publisher),
+):
+    snap_result = await db.execute(
+        select(ReportSnapshot).where(ReportSnapshot.report_id == report_id)
+    )
+    snapshot = snap_result.scalar_one_or_none()
+    if not snapshot:
+        raise HTTPException(404, "Dados ainda não importados. Clique em 'Atualizar dados' primeiro.")
+    return snapshot.data
 
 
 @router.get("/reports/{report_id}/permissions", response_model=list[PermissionOut])

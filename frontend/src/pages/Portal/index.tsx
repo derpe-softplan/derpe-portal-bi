@@ -1,43 +1,65 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { BarChart3, ChevronRight, Clock } from "lucide-react";
-import { portalApi, ReportCard } from "../../services/api";
+import { BarChart3, Clock, AlertCircle } from "lucide-react";
+import { portalApi, ReportCard, resolveImageUrl } from "../../services/api";
+import { resolveThumbnailBySlug } from "../../panels/registry";
 
 function ReportCardItem({ report }: { report: ReportCard }) {
   const navigate = useNavigate();
-  const date = report.published_at
-    ? new Date(report.published_at).toLocaleDateString("pt-BR")
-    : null;
+  const Thumbnail = resolveThumbnailBySlug(report.slug);
+  const hasData = !!report.last_refreshed_at;
 
   return (
     <div
-      className="card p-5 hover:shadow-md transition-shadow cursor-pointer group"
+      className="card p-0 overflow-hidden cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
       onClick={() => navigate(`/relatorio/${report.slug}`)}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="w-10 h-10 bg-gov-blue-light rounded-lg flex items-center justify-center text-gov-blue">
-          <BarChart3 size={20} />
-        </div>
-        <ChevronRight
-          size={18}
-          className="text-gray-300 group-hover:text-gov-blue transition-colors mt-1"
-        />
+      {/* Thumbnail */}
+      <div className="relative h-36 bg-gray-100 overflow-hidden border-b border-gray-100">
+        {report.cover_image_url ? (
+          <img src={resolveImageUrl(report.cover_image_url, true)} alt={report.title} className="w-full h-full object-cover" />
+        ) : Thumbnail ? (
+          <Thumbnail />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <BarChart3 size={36} className="text-gray-200" />
+          </div>
+        )}
+        {!hasData && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+            <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+              Aguardando dados
+            </span>
+          </div>
+        )}
       </div>
 
-      <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-gov-blue transition-colors">
-        {report.title}
-      </h3>
+      {/* Body */}
+      <div className="p-4">
+        <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-gov-blue transition-colors leading-snug">
+          {report.title}
+        </h3>
 
-      {report.description && (
-        <p className="text-sm text-gray-500 line-clamp-2 mb-3">{report.description}</p>
-      )}
+        {report.description && (
+          <p className="text-sm text-gray-500 line-clamp-2 mb-3">{report.description}</p>
+        )}
 
-      {date && (
-        <div className="flex items-center gap-1.5 text-xs text-gray-400">
-          <Clock size={12} />
-          Publicado em {date}
+        <div className="flex items-center gap-1.5 text-xs">
+          {hasData ? (
+            <>
+              <Clock size={11} className="text-green-500 flex-shrink-0" />
+              <span className="text-gray-400">
+                Atualizado em {new Date(report.last_refreshed_at!).toLocaleDateString("pt-BR")}
+              </span>
+            </>
+          ) : (
+            <>
+              <AlertCircle size={11} className="text-amber-500 flex-shrink-0" />
+              <span className="text-amber-600">Aguardando importação</span>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

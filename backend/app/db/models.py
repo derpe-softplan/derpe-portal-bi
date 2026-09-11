@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean, Column, DateTime, Enum, ForeignKey,
-    Integer, String, Text, UniqueConstraint,
+    Integer, JSON, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -69,6 +69,7 @@ class Report(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String(200), nullable=False)
     description = Column(Text)
+    cover_image_url = Column(String(500), nullable=True)
     slug = Column(String(100), unique=True, nullable=False, index=True)
     sql_query = Column(Text, nullable=False)
     chart_config = Column(Text)
@@ -80,6 +81,29 @@ class Report(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     permissions = relationship("ReportPermission", back_populates="report", cascade="all, delete-orphan")
+    snapshot = relationship("ReportSnapshot", back_populates="report", uselist=False, cascade="all, delete-orphan")
+
+    @property
+    def access_profiles(self):
+        return [p.group_id for p in self.permissions if p.group_id is not None]
+
+    @property
+    def access_users(self):
+        return [p.user_id for p in self.permissions if p.user_id is not None]
+
+
+class ReportSnapshot(Base):
+    __tablename__ = "report_snapshots"
+
+    id = Column(Integer, primary_key=True)
+    report_id = Column(Integer, ForeignKey("reports.id", ondelete="CASCADE"), nullable=False, unique=True)
+    data = Column(JSON, nullable=False)
+    row_count = Column(Integer, nullable=False, default=0)
+    refreshed_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    refreshed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    report = relationship("Report", back_populates="snapshot")
+    refreshed_by = relationship("User", foreign_keys=[refreshed_by_id])
 
 
 class ReportPermission(Base):

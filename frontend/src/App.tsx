@@ -46,12 +46,13 @@ export default function App() {
         path="/relatorio/:slug"
         element={
           <RequireAuth>
-            <PortalLayout>
+            <PortalLayout wide>
               <ReportPage />
             </PortalLayout>
           </RequireAuth>
         }
       />
+
 
       <Route
         path="/admin"

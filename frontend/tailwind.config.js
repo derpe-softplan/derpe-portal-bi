@@ -10,6 +10,11 @@ export default {
           "blue-light": "#E8F0FA",
           yellow: "#FFB800",
         },
+        sidebar: {
+          DEFAULT: "#0C2856",
+          hover: "#1a3a6b",
+          active: "#0068FF",
+        },
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],

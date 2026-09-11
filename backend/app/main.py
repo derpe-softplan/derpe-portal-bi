@@ -1,20 +1,28 @@
 import logging
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from redis.asyncio import Redis
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.db.base import Base
-from app.db.models import User, UserRole
+from app.db.models import Report, ReportStatus, User, UserRole
 from app.db.session import AsyncSessionLocal, engine
-from app.auth.service import hash_password
+from app.auth.service import hash_password, verify_password
+from app.reports import CATALOG
 import app.superset.client as superset_module
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads" / "reports"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 redis_client: Redis = None  # type: ignore
 
@@ -28,23 +36,61 @@ async def lifespan(app: FastAPI):
     logger.info("Tabelas criadas/verificadas")
 
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(User).where(User.email == settings.admin_email))
-        if not result.scalar_one_or_none():
-            admin = User(
-                email=settings.admin_email,
-                full_name="Administrador",
-                hashed_password=hash_password(settings.admin_password),
-                role=UserRole.admin,
-            )
-            session.add(admin)
-            await session.commit()
-            logger.info(f"Usuário admin criado: {settings.admin_email}")
+        try:
+            result = await session.execute(select(User).where(User.email == settings.admin_email))
+            existing_admin = result.scalar_one_or_none()
+            if not existing_admin:
+                session.add(User(
+                    email=settings.admin_email,
+                    full_name="Administrador",
+                    hashed_password=hash_password(settings.admin_password),
+                    role=UserRole.admin,
+                    is_active=True,
+                ))
+                await session.commit()
+                logger.info(f"Usuário admin criado: {settings.admin_email}")
+            else:
+                existing_admin.full_name = "Administrador"
+                existing_admin.role = UserRole.admin
+                existing_admin.is_active = True
+                if not verify_password(settings.admin_password, existing_admin.hashed_password):
+                    existing_admin.hashed_password = hash_password(settings.admin_password)
+                    await session.commit()
+                    logger.info(f"Senha do usuário admin sincronizada com .env para: {settings.admin_email}")
+        except IntegrityError:
+            await session.rollback()
+
+    async with AsyncSessionLocal() as session:
+        for spec in CATALOG:
+            try:
+                result = await session.execute(
+                    select(Report).where(Report.slug == spec.slug)
+                )
+                existing = result.scalar_one_or_none()
+                if not existing:
+                    session.add(Report(
+                        title=spec.title,
+                        description=spec.description,
+                        slug=spec.slug,
+                        sql_query=spec.sql,
+                        status=ReportStatus.in_review,
+                    ))
+                    logger.info(f"Relatório registrado: '{spec.title}'")
+                else:
+                    existing.title = spec.title
+                    existing.description = spec.description
+                    existing.sql_query = spec.sql
+                    logger.info(f"Relatório sincronizado: '{spec.title}'")
+                await session.commit()
+            except IntegrityError:
+                await session.rollback()
 
     superset_module.init_client(
         base_url=settings.superset_url,
         username=settings.superset_user,
         password=settings.superset_password,
         database_name=settings.superset_database_name,
+        schema=settings.superset_schema,
         verify_ssl=settings.superset_verify_ssl,
     )
 
@@ -54,10 +100,13 @@ async def lifespan(app: FastAPI):
     yield
 
     await redis_client.aclose()
+    await superset_module.get_client().close()
     await engine.dispose()
 
 
 app = FastAPI(title="DER-PE Portal BI", lifespan=lifespan)
+
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,

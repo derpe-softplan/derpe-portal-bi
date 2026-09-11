@@ -1,10 +1,16 @@
 import { ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { BarChart3, LayoutDashboard, LogOut, Settings, Users } from "lucide-react";
+import { BarChart3, LayoutDashboard, LogOut, Settings } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import clsx from "clsx";
 
-export default function PortalLayout({ children }: { children: ReactNode }) {
+export default function PortalLayout({
+  children,
+  wide = false,
+}: {
+  children: ReactNode;
+  wide?: boolean;
+}) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -13,14 +19,13 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
     navigate("/login");
   };
 
-  const isAdmin = user?.role === "admin";
   const isPublisher = user?.role === "admin" || user?.role === "publisher";
+  const isViewer = user?.role === "viewer";
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <header className="bg-gov-blue text-white shadow-md z-10">
-        {/* Gov strip */}
         <div className="bg-gov-blue-dark text-xs py-1 px-4 flex items-center gap-2 opacity-90">
           <div className="w-1.5 h-1.5 bg-gov-yellow rounded-full" />
           <span>Governo do Estado de Pernambuco</span>
@@ -37,24 +42,11 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
-            <NavLink
-              to="/"
-              end
-              className={({ isActive }) =>
-                clsx(
-                  "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  isActive ? "bg-white/20" : "hover:bg-white/10"
-                )
-              }
-            >
-              <LayoutDashboard size={15} />
-              Painel
-            </NavLink>
-
-            {isPublisher && (
+          {!isViewer && (
+            <nav className="hidden md:flex items-center gap-1">
               <NavLink
-                to="/admin"
+                to="/"
+                end
                 className={({ isActive }) =>
                   clsx(
                     "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
@@ -62,11 +54,26 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
                   )
                 }
               >
-                <Settings size={15} />
-                Admin
+                <LayoutDashboard size={15} />
+                Painel
               </NavLink>
-            )}
-          </nav>
+
+              {isPublisher && (
+                <NavLink
+                  to="/admin"
+                  className={({ isActive }) =>
+                    clsx(
+                      "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      isActive ? "bg-white/20" : "hover:bg-white/10"
+                    )
+                  }
+                >
+                  <Settings size={15} />
+                  Admin
+                </NavLink>
+              )}
+            </nav>
+          )}
 
           <div className="flex items-center gap-3">
             <div className="hidden sm:block text-right">
@@ -85,7 +92,12 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
       </header>
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
-      <main className="flex-1 px-4 lg:px-8 py-6 max-w-screen-2xl w-full mx-auto">
+      <main
+        className={clsx(
+          "flex-1 px-4 lg:px-8 py-6 w-full mx-auto",
+          wide ? "max-w-[1600px]" : "max-w-screen-2xl"
+        )}
+      >
         {children}
       </main>
 

@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     superset_user: str
     superset_password: str
     superset_database_name: str = "BI-PRO-CONSULTA"
+    superset_schema: str = "siderdwh"
     superset_verify_ssl: bool = True
 
     postgres_host: str = "postgres"
