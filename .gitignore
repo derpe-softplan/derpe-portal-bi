@@ -1,0 +1,26 @@
+# Credenciais
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Docker
+*.log
+
+# Editores / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Claude Code
+.claude/
