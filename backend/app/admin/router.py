@@ -20,7 +20,7 @@ from app.db.session import get_db
 from app.superset.client import get_client
 
 router = APIRouter()
-UPLOADS_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "reports"
+UPLOADS_DIR = Path(__file__).resolve().parents[2] / "uploads" / "reports"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 

@@ -729,6 +729,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
   const [diretoriaFiltro,setDiretoriaFiltro]= useState<string | null>(null)
   const [localSearch,    setLocalSearch]    = useState('')
   const [showHelp,       setShowHelp]       = useState(false)
+  const [activePage,     setActivePage]     = useState<'resumo' | 'analitico' | 'rastreio'>('resumo')
 
   const tableRef = useRef<HTMLDivElement>(null)
 
@@ -870,11 +871,12 @@ export function FluxoMedicoes({ data: rawData }: Props) {
   function handleDimClick(setter: (v: string | null) => void, current: string | null, valor: string) {
     setter(current === valor ? null : valor)
     setLocalSearch('')
+    setActivePage('rastreio')
     setTimeout(() => tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
   }
 
-  function handleEtapa(etapa: string | null) { setEtapaFiltro(etapa); setLocalSearch('') }
-  function handleFiltrarEtapa(etapa: string) { setEtapaFiltro(prev => prev === etapa ? null : etapa); setLocalSearch('') }
+  function handleEtapa(etapa: string | null) { setEtapaFiltro(etapa); setLocalSearch(''); setActivePage('rastreio') }
+  function handleFiltrarEtapa(etapa: string) { setEtapaFiltro(prev => prev === etapa ? null : etapa); setLocalSearch(''); setActivePage('rastreio') }
 
   const lookupEtapaLabel = (etapa: string | null) => {
     if (!etapa) return null
@@ -902,67 +904,94 @@ export function FluxoMedicoes({ data: rawData }: Props) {
         onHelp={() => setShowHelp(true)}
       />
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard title="Em Aberto" value={fmtNum(kpis.em_aberto)} subtitle={`${brl(kpis.valor_em_aberto)} ainda não pago`} icon={<CircleAlert size={18} />} accent="blue" onClick={kpis.em_aberto ? () => handleFiltrarEtapa('EM_ABERTO') : undefined} tooltip="Medições já fechadas e que ainda não foram pagas." />
-        <KpiCard title="Ag. Pagamento" value={fmtNum(kpis.aguardando_pagamento)} subtitle={`${brl(kpis.valor_aguardando_pgto)} liquidados`} icon={<Banknote size={18} />} accent="teal" onClick={kpis.aguardando_pagamento ? () => handleFiltrarEtapa('Liquidada') : undefined} tooltip="Medições já liquidadas aguardando transferência do pagamento." />
-        <KpiCard title="Ag. Nota Fiscal" value={fmtNum(kpis.aguardando_nota)} subtitle={`${brl(kpis.valor_aguardando_nota)} em aberto`} icon={<FileText size={18} />} accent="orange" onClick={kpis.aguardando_nota ? () => handleFiltrarEtapa('Finalizada - aguardando nota') : undefined} tooltip="Medições aprovadas aguardando nota fiscal da empresa." />
-        <KpiCard title="Alertas Críticos" value={fmtNum(kpis.alertas_criticos)} subtitle={`${brl(kpis.valor_alertas)} represados +30d`} icon={<AlertTriangle size={18} />} accent="red" onClick={kpis.alertas_criticos ? () => handleFiltrarEtapa('ALERTAS_CRITICOS') : undefined} tooltip="Medições em etapas financeiras sem movimentação há mais de 30 dias." />
+      <div className="rounded-2xl border border-slate-200 bg-slate-100 p-1.5 inline-flex flex-wrap gap-1.5 w-full md:w-auto shadow-sm">
+        {[
+          { id: 'resumo', label: 'Resumo' },
+          { id: 'analitico', label: 'Análise' },
+          { id: 'rastreio', label: 'Rastreio' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActivePage(tab.id as 'resumo' | 'analitico' | 'rastreio')}
+            className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all ${
+              activePage === tab.id
+                ? 'bg-white text-blue-700 shadow-sm ring-1 ring-blue-100'
+                : 'text-slate-600 hover:text-slate-800 hover:bg-white/60'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* NaoPagas: medições fechadas e não pagas */}
-      <div className="card">
-        <div className="mb-4">
-          <h2 className="text-base font-bold text-gray-800">Medições em aberto</h2>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Medições já fechadas e não pagas · clique nos gráficos para filtrar a tabela
-          </p>
-        </div>
-        <div className="mt-0 mb-4">
-          <DimChart title="Por Competência" items={dimCompetencia} color="#EC4899" icon={<BarChart3 size={14} />} chartType="column" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <DimChart title="Por Empresa" items={dimEmpresa} color="#F97316" icon={<Building2 size={14} />} onBarClick={v => handleDimClick(setEmpresa, empresa, v)} activeValue={empresa} />
-          <DimChart title="Por Rodovia" items={dimRodovia} color="#10B981" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setRodovia, rodovia, v)} activeValue={rodovia} />
-          <DimChart title="Por Setor" items={dimSetor} color="#8B5CF6" icon={<BarChart3 size={14} />} />
-        </div>
-      </div>
+      {activePage === 'resumo' && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <KpiCard title="Em Aberto" value={fmtNum(kpis.em_aberto)} subtitle={`${brl(kpis.valor_em_aberto)} ainda não pago`} icon={<CircleAlert size={18} />} accent="blue" onClick={kpis.em_aberto ? () => handleFiltrarEtapa('EM_ABERTO') : undefined} tooltip="Medições já fechadas e que ainda não foram pagas." />
+            <KpiCard title="Ag. Pagamento" value={fmtNum(kpis.aguardando_pagamento)} subtitle={`${brl(kpis.valor_aguardando_pgto)} liquidados`} icon={<Banknote size={18} />} accent="teal" onClick={kpis.aguardando_pagamento ? () => handleFiltrarEtapa('Liquidada') : undefined} tooltip="Medições já liquidadas aguardando transferência do pagamento." />
+            <KpiCard title="Ag. Nota Fiscal" value={fmtNum(kpis.aguardando_nota)} subtitle={`${brl(kpis.valor_aguardando_nota)} em aberto`} icon={<FileText size={18} />} accent="orange" onClick={kpis.aguardando_nota ? () => handleFiltrarEtapa('Finalizada - aguardando nota') : undefined} tooltip="Medições aprovadas aguardando nota fiscal da empresa." />
+            <KpiCard title="Alertas Críticos" value={fmtNum(kpis.alertas_criticos)} subtitle={`${brl(kpis.valor_alertas)} represados +30d`} icon={<AlertTriangle size={18} />} accent="red" onClick={kpis.alertas_criticos ? () => handleFiltrarEtapa('ALERTAS_CRITICOS') : undefined} tooltip="Medições em etapas financeiras sem movimentação há mais de 30 dias." />
+          </div>
 
-      {/* Funil */}
-      <div className="card">
-        <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
+          <div className="card">
+            <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-700">Jornada Completa das Medições</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Clique em uma etapa para filtrar a tabela
+                  {etapaFiltro && <button onClick={() => setEtapaFiltro(null)} className="ml-2 text-blue-500 hover:text-blue-700 font-semibold">· Limpar</button>}
+                </p>
+              </div>
+              {etapaFiltro && <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">{lookupEtapaLabel(etapaFiltro)}</span>}
+            </div>
+            <FunilCompleto data={filteredBase} activeEtapa={etapaFiltro} onEtapaClick={handleEtapa} />
+          </div>
+
           <div>
-            <h2 className="text-sm font-semibold text-gray-700">Jornada Completa das Medições</h2>
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">Atenção Imediata</h2>
+            <AlertasPanel data={filteredBase} onFiltrarEtapa={handleFiltrarEtapa} />
+          </div>
+        </div>
+      )}
+
+      {activePage === 'analitico' && (
+        <div className="card space-y-5">
+          <div className="mb-4">
+            <h2 className="text-base font-bold text-gray-800">Medições em aberto</h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              Clique em uma etapa para filtrar a tabela
-              {etapaFiltro && <button onClick={() => setEtapaFiltro(null)} className="ml-2 text-blue-500 hover:text-blue-700 font-semibold">· Limpar</button>}
+              Medições já fechadas e não pagas · clique nos gráficos para filtrar a tabela
             </p>
           </div>
-          {etapaFiltro && <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">{lookupEtapaLabel(etapaFiltro)}</span>}
-        </div>
-        <FunilCompleto data={filteredBase} activeEtapa={etapaFiltro} onEtapaClick={handleEtapa} />
-      </div>
-
-      {/* Alertas */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Atenção Imediata</h2>
-        <AlertasPanel data={filteredBase} onFiltrarEtapa={handleFiltrarEtapa} />
-      </div>
-
-      {/* Tabela */}
-      <div ref={tableRef} className="card">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-700">Rastreio de Medições</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Vermelho = crítico +30d · Amarelo = atenção 15–30d</p>
+          <div className="mt-0 mb-4">
+            <DimChart title="Por Competência" items={dimCompetencia} color="#EC4899" icon={<BarChart3 size={14} />} chartType="column" />
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {etapaFiltro && <button onClick={() => setEtapaFiltro(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50"><X size={11} />{lookupEtapaLabel(etapaFiltro)}</button>}
-            {diretoriaFiltro && <button onClick={() => setDiretoriaFiltro(null)} className="flex items-center gap-1 text-xs text-emerald-600 border border-emerald-200 rounded-lg px-2.5 py-1.5 hover:bg-emerald-50"><X size={11} />{diretoriaFiltro}</button>}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <DimChart title="Por Empresa" items={dimEmpresa} color="#F97316" icon={<Building2 size={14} />} onBarClick={v => handleDimClick(setEmpresa, empresa, v)} activeValue={empresa} />
+            <DimChart title="Por Rodovia" items={dimRodovia} color="#10B981" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setRodovia, rodovia, v)} activeValue={rodovia} />
+            <DimChart title="Por Setor" items={dimSetor} color="#8B5CF6" icon={<BarChart3 size={14} />} />
           </div>
         </div>
-        <FluxoTable data={filtered} localSearch={localSearch} onLocalSearch={setLocalSearch} />
-      </div>
+      )}
+
+      {activePage === 'rastreio' && (
+        <div ref={tableRef} className="card">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-700">Rastreio de Medições</h2>
+              <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />Crítico +30d</span>
+                <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />Atenção 15–30d</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {etapaFiltro && <button onClick={() => setEtapaFiltro(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50"><X size={11} />{lookupEtapaLabel(etapaFiltro)}</button>}
+              {diretoriaFiltro && <button onClick={() => setDiretoriaFiltro(null)} className="flex items-center gap-1 text-xs text-emerald-600 border border-emerald-200 rounded-lg px-2.5 py-1.5 hover:bg-emerald-50"><X size={11} />{diretoriaFiltro}</button>}
+            </div>
+          </div>
+          <FluxoTable data={filtered} localSearch={localSearch} onLocalSearch={setLocalSearch} />
+        </div>
+      )}
     </div>
   )
 }
