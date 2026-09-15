@@ -60,6 +60,17 @@ rodovias AS (
     WHERE t.flactive = 'S'
     GROUP BY t.skcontrato
 ),
+municipios AS (
+    SELECT
+        c.skcontrato,
+        STRING_AGG(DISTINCT m.nmmunicipio, ', ' ORDER BY m.nmmunicipio) AS municipios
+    FROM siderdwh.ebisfobramunicipio om
+    JOIN siderdwh.ebisdobracontrato doc ON doc.skobra = om.skobra
+    JOIN siderdwh.ebisdcontrato c       ON c.nutitulo  = doc.nutitulo
+    JOIN siderdwh.ebisdmunicipio m      ON m.skmunicipio = om.skmunicipio
+    WHERE om.skmunicipio <> 0
+    GROUP BY c.skcontrato
+),
 notas_agg AS (
     SELECT
         dm.skmedicao,
@@ -120,6 +131,30 @@ empresas AS (
     WHERE sc.flactive = 'S'
     GROUP BY sc.skcontrato
 ),
+empenho_contrato AS (
+    SELECT
+        skcontrato,
+        COALESCE(SUM(vlliquido), 0) AS vlliquido_empenho
+    FROM siderdwh.ebisfaofempenho
+    GROUP BY skcontrato
+),
+executado_contrato AS (
+    SELECT
+        mc.skcontrato,
+        COALESCE(SUM(la.vlliquidado), 0) AS valor_executado
+    FROM siderdwh.ebisfmedicaocontrato mc
+    LEFT JOIN liquidacao_agg la ON la.skmedicao = mc.skmedicao
+    GROUP BY mc.skcontrato
+),
+ultima_medicao_valor AS (
+    SELECT DISTINCT ON (mc.skcontrato)
+        mc.skcontrato,
+        COALESCE(mca.valor_medido + mca.valor_reajuste, 0) AS ultimo_vlevento
+    FROM siderdwh.ebisfmedicaocontrato mc
+    JOIN mcc_agregado mca ON mca.skmedicao = mc.skmedicao
+    WHERE mc.flaprovada = 'S'
+    ORDER BY mc.skcontrato, mc.skmedicao DESC
+),
 medicao AS (
     SELECT
         mc.skcontrato,
@@ -138,6 +173,7 @@ medicao AS (
         a.assinaram,
         a.faltam_assinar,
         r.rodovias,
+        mun.municipios,
         na.qt_notas,
         na.vlnotas,
         na.sktempoprimeiranota,
@@ -161,7 +197,11 @@ medicao AS (
         td_sei.dttempo        AS dt_envio_sei,
         td_andamento.dttempo  AS dt_criacao,
         td_ultimaliq.dttempo  AS dt_ultima_liq,
-        td_ultimopgto.dttempo AS dt_ultimo_pgto
+        td_ultimopgto.dttempo AS dt_ultimo_pgto,
+        ec.vlliquido_empenho,
+        xc.valor_executado,
+        um.ultimo_vlevento                              AS ultimo_vlevento_contrato,
+        td_fimexec.dttempo                              AS dt_fim_execucao
     FROM siderdwh.ebisfmedicaocontrato mc
     LEFT JOIN siderdwh.ebisdmedicaocontrato mdc    ON mdc.skmedicao = mc.skmedicao
     LEFT JOIN siderdwh.ebisdsituacaomedicao sm     ON sm.sksituacaomedicao = mc.sksituacaomedicao
@@ -169,6 +209,7 @@ medicao AS (
     LEFT JOIN medhist_andamento hi        ON hi.skcontrato = mc.skcontrato AND hi.skmedicao = mc.skmedicao
     LEFT JOIN assinatura a                ON a.skmedicao = mc.skmedicao
     LEFT JOIN rodovias r                  ON r.skcontrato = mc.skcontrato
+    LEFT JOIN municipios mun              ON mun.skcontrato = mc.skcontrato
     LEFT JOIN notas_agg na                ON na.skmedicao = mc.skmedicao
     LEFT JOIN liquidacao_agg lq           ON lq.skmedicao = mc.skmedicao
     LEFT JOIN pagamento_agg pg            ON pg.skmedicao = mc.skmedicao
@@ -185,6 +226,10 @@ medicao AS (
     LEFT JOIN siderdwh.ebisdtempo td_andamento     ON td_andamento.sktempo = NULLIF(hi.sktempoandamento, 0)
     LEFT JOIN siderdwh.ebisdtempo td_ultimaliq     ON td_ultimaliq.sktempo = lq.sktempoultimaliq
     LEFT JOIN siderdwh.ebisdtempo td_ultimopgto    ON td_ultimopgto.sktempo = pg.sktempoultimopgto
+    LEFT JOIN empenho_contrato ec               ON ec.skcontrato = mc.skcontrato
+    LEFT JOIN executado_contrato xc             ON xc.skcontrato = mc.skcontrato
+    LEFT JOIN ultima_medicao_valor um           ON um.skcontrato = mc.skcontrato
+    LEFT JOIN siderdwh.ebisdtempo td_fimexec    ON td_fimexec.sktempo = NULLIF(fc.sktempofimexecucaoaditivo, 0)
 )
 SELECT
     m.cdtitulo                                                             AS "Contrato",
@@ -193,6 +238,7 @@ SELECT
     m.deobjetoresumido                                                     AS "Objeto",
     m.denaturezacontrato                                                   AS "Natureza",
     m.rodovias                                                             AS "Rodovias",
+    m.municipios                                                           AS "Municípios",
     m.flaprovada                                                           AS "Aprovada?",
     CASE
         WHEN m.flaprovada = 'N' AND COALESCE(m.vlevento, 0) = 0  THEN 'Criada'
@@ -263,7 +309,19 @@ SELECT
         WHEN COALESCE(m.vlpago, 0) > 0 AND m.vlpago < m.vlevento THEN 'Paga parcialmente'
         WHEN COALESCE(m.vlpago, 0) >= m.vlevento AND m.vlevento > 0 THEN 'Paga integralmente'
         ELSE 'Indefinido'
-    END                                                                     AS "Etapa Atual da Jornada"
+    END                                                                     AS "Etapa Atual da Jornada",
+    m.dt_fim_execucao                                                        AS "Data Fim Execução",
+    m.vlliquido_empenho                                                      AS "Empenho Total",
+    m.valor_executado                                                        AS "Valor Executado",
+    (COALESCE(m.vlliquido_empenho, 0) - COALESCE(m.valor_executado, 0))     AS "Saldo Empenho",
+    m.ultimo_vlevento_contrato                                               AS "Último Valor Medido (Contrato)",
+    CASE
+        WHEN (COALESCE(m.vlliquido_empenho, 0) - COALESCE(m.valor_executado, 0))
+             < COALESCE(m.ultimo_vlevento_contrato, 0)
+             AND COALESCE(m.ultimo_vlevento_contrato, 0) > 0
+        THEN 'Insuficiente'
+        ELSE 'Suficiente'
+    END                                                                      AS "Saldo para Próxima Medição"
 FROM medicao m
 --WHERE m.dt_criacao >= DATE '2026-06-01'
 ORDER BY 1, 2;

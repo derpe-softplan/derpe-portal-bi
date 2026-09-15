@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
@@ -16,6 +16,7 @@ from app.db.models import Report, ReportStatus, User, UserRole
 from app.db.session import AsyncSessionLocal, engine
 from app.auth.service import hash_password, verify_password
 from app.reports import CATALOG
+from app.reports.refresh import run_refresh, scheduler, setup_scheduler
 import app.superset.client as superset_module
 
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +34,9 @@ async def lifespan(app: FastAPI):
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text(
+            "ALTER TABLE reports ADD COLUMN IF NOT EXISTS refresh_schedule VARCHAR(100)"
+        ))
     logger.info("Tabelas criadas/verificadas")
 
     async with AsyncSessionLocal() as session:
@@ -60,6 +64,7 @@ async def lifespan(app: FastAPI):
         except IntegrityError:
             await session.rollback()
 
+    schedule_map: dict[int, str] = {}
     async with AsyncSessionLocal() as session:
         for spec in CATALOG:
             try:
@@ -68,22 +73,36 @@ async def lifespan(app: FastAPI):
                 )
                 existing = result.scalar_one_or_none()
                 if not existing:
-                    session.add(Report(
+                    report = Report(
                         title=spec.title,
                         description=spec.description,
                         slug=spec.slug,
                         sql_query=spec.sql,
+                        refresh_schedule=spec.refresh_schedule,
                         status=ReportStatus.in_review,
-                    ))
+                    )
+                    session.add(report)
                     logger.info(f"Relatório registrado: '{spec.title}'")
                 else:
                     existing.title = spec.title
                     existing.description = spec.description
                     existing.sql_query = spec.sql
+                    # refresh_schedule não é sobrescrito — gerenciado pela UI
                     logger.info(f"Relatório sincronizado: '{spec.title}'")
                 await session.commit()
             except IntegrityError:
                 await session.rollback()
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Report).where(Report.refresh_schedule.isnot(None))
+        )
+        for report in result.scalars().all():
+            schedule_map[report.id] = report.refresh_schedule
+
+    setup_scheduler(schedule_map)
+    scheduler.start()
+    logger.info("Scheduler iniciado com %d job(s)", len(schedule_map))
 
     superset_module.init_client(
         base_url=settings.superset_url,
@@ -99,6 +118,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    scheduler.shutdown(wait=False)
     await redis_client.aclose()
     await superset_module.get_client().close()
     await engine.dispose()
@@ -106,7 +126,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="DER-PE Portal BI", lifespan=lifespan)
 
-app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR.parent)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,

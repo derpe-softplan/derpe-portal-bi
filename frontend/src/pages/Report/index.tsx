@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Clock, Database } from "lucide-react";
-import { portalApi } from "../../services/api";
+import { portalApi, parseUTC } from "../../services/api";
 import { resolvePanelBySlug } from "../../panels/registry";
 
 function CellValue({ value }: { value: unknown }) {
@@ -37,7 +37,7 @@ export default function ReportPage() {
           <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
             <Clock size={11} />
             Atualizado em{" "}
-            {new Date(meta.last_refreshed_at).toLocaleString("pt-BR")}
+            {parseUTC(meta.last_refreshed_at)?.toLocaleString("pt-BR")}
           </p>
         )}
       </div>

@@ -1,15 +1,28 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, ChevronDown } from 'lucide-react'
+import { Search, ChevronDown, Check } from 'lucide-react'
 
-export interface ComboBoxProps {
+interface ComboBoxBase {
   label: string
-  value: string | null
   options: string[]
-  onChange: (v: string | null) => void
   allLabel?: string
 }
 
-export function ComboBox({ label, value, options, onChange, allLabel = 'Todos' }: ComboBoxProps) {
+interface ComboBoxSingle extends ComboBoxBase {
+  multiple?: false
+  value: string | null
+  onChange: (v: string | null) => void
+}
+
+interface ComboBoxMulti extends ComboBoxBase {
+  multiple: true
+  value: string[]
+  onChange: (v: string[]) => void
+}
+
+export type ComboBoxProps = ComboBoxSingle | ComboBoxMulti
+
+export function ComboBox(props: ComboBoxProps) {
+  const { label, options, allLabel = 'Todos' } = props
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -29,10 +42,31 @@ export function ComboBox({ label, value, options, onChange, allLabel = 'Todos' }
   }, [])
 
   const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()))
-  const isActive = !!value
+  const isMulti = props.multiple === true
+  const selected: string[] = isMulti
+    ? (props.value as string[])
+    : ((props.value as string | null) ? [(props.value as string)] : [])
+  const isActive = selected.length > 0
 
-  function selectOption(v: string | null) {
-    onChange(v)
+  function getLabel() {
+    if (!isActive) return allLabel
+    if (selected.length === 1) return selected[0]
+    return `${selected.length} selecionados`
+  }
+
+  function handleSelect(v: string) {
+    if (props.multiple) {
+      const next = props.value.includes(v) ? props.value.filter(x => x !== v) : [...props.value, v]
+      props.onChange(next)
+    } else {
+      props.onChange(v)
+      setOpen(false)
+    }
+  }
+
+  function handleClear() {
+    if (props.multiple) props.onChange([])
+    else props.onChange(null)
     setOpen(false)
   }
 
@@ -45,13 +79,14 @@ export function ComboBox({ label, value, options, onChange, allLabel = 'Todos' }
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
+        title={isActive ? selected.join(', ') : undefined}
         className={`w-full flex items-center justify-between text-sm border rounded-lg px-3 py-2 bg-white cursor-pointer transition-colors ${
           isActive
             ? 'border-blue-400 text-blue-700 bg-blue-50'
             : 'border-gray-200 text-gray-700 hover:border-gray-300'
         } focus:outline-none focus:ring-2 focus:ring-blue-200`}
       >
-        <span className="truncate">{value ?? allLabel}</span>
+        <span className="truncate">{getLabel()}</span>
         <ChevronDown size={14} className={`ml-2 flex-shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -74,8 +109,8 @@ export function ComboBox({ label, value, options, onChange, allLabel = 'Todos' }
             <li>
               <button
                 type="button"
-                onClick={() => selectOption(null)}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${!value ? 'font-semibold text-blue-600 bg-blue-50' : 'text-gray-500 italic'}`}
+                onClick={handleClear}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${!isActive ? 'font-semibold text-blue-600 bg-blue-50' : 'text-gray-500 italic'}`}
               >
                 {allLabel}
               </button>
@@ -84,10 +119,18 @@ export function ComboBox({ label, value, options, onChange, allLabel = 'Todos' }
               <li key={o}>
                 <button
                   type="button"
-                  onClick={() => selectOption(o)}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${value === o ? 'font-semibold text-blue-600 bg-blue-50' : 'text-gray-700'}`}
+                  onClick={() => handleSelect(o)}
+                  title={o}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors flex items-center gap-2.5 ${selected.includes(o) ? 'text-blue-700 bg-blue-50' : 'text-gray-700'}`}
                 >
-                  {o}
+                  {isMulti && (
+                    <span className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                      selected.includes(o) ? 'bg-blue-500 border-blue-500' : 'border-gray-300 bg-white'
+                    }`}>
+                      {selected.includes(o) && <Check size={10} className="text-white" strokeWidth={3} />}
+                    </span>
+                  )}
+                  <span className={`truncate ${selected.includes(o) ? 'font-semibold' : ''}`}>{o}</span>
                 </button>
               </li>
             ))}
@@ -95,6 +138,17 @@ export function ComboBox({ label, value, options, onChange, allLabel = 'Todos' }
               <li className="px-3 py-3 text-xs text-gray-400 text-center">Nenhum resultado</li>
             )}
           </ul>
+          {isMulti && (
+            <div className="p-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="w-full text-xs font-semibold text-blue-600 hover:text-blue-800 py-1.5 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+              >
+                {isActive ? `Confirmar (${selected.length})` : 'Fechar'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { BarChart3, Clock, AlertCircle } from "lucide-react";
-import { portalApi, ReportCard, resolveImageUrl } from "../../services/api";
+import { portalApi, parseUTC, ReportCard, resolveImageUrl } from "../../services/api";
 import { resolveThumbnailBySlug } from "../../panels/registry";
 
 function ReportCardItem({ report }: { report: ReportCard }) {
@@ -49,7 +49,7 @@ function ReportCardItem({ report }: { report: ReportCard }) {
             <>
               <Clock size={11} className="text-green-500 flex-shrink-0" />
               <span className="text-gray-400">
-                Atualizado em {new Date(report.last_refreshed_at!).toLocaleDateString("pt-BR")}
+                Atualizado em {parseUTC(report.last_refreshed_at)?.toLocaleDateString("pt-BR")}
               </span>
             </>
           ) : (

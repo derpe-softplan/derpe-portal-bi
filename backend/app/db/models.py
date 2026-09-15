@@ -73,6 +73,7 @@ class Report(Base):
     slug = Column(String(100), unique=True, nullable=False, index=True)
     sql_query = Column(Text, nullable=False)
     chart_config = Column(Text)
+    refresh_schedule = Column(String(100), nullable=True)
     status = Column(Enum(ReportStatus), nullable=False, default=ReportStatus.draft)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     reviewed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -82,6 +83,7 @@ class Report(Base):
 
     permissions = relationship("ReportPermission", back_populates="report", cascade="all, delete-orphan")
     snapshot = relationship("ReportSnapshot", back_populates="report", uselist=False, cascade="all, delete-orphan")
+    refresh_logs = relationship("RefreshLog", back_populates="report", cascade="all, delete-orphan")
 
     @property
     def access_profiles(self):
@@ -104,6 +106,21 @@ class ReportSnapshot(Base):
 
     report = relationship("Report", back_populates="snapshot")
     refreshed_by = relationship("User", foreign_keys=[refreshed_by_id])
+
+
+class RefreshLog(Base):
+    __tablename__ = "refresh_logs"
+
+    id = Column(Integer, primary_key=True)
+    report_id = Column(Integer, ForeignKey("reports.id", ondelete="CASCADE"), nullable=False)
+    triggered_by = Column(String(100), nullable=False)  # "scheduler" ou email do usuário
+    status = Column(String(10), nullable=False)          # "success" | "error"
+    row_count = Column(Integer, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
+    error_message = Column(Text, nullable=True)
+    started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    report = relationship("Report", back_populates="refresh_logs")
 
 
 class ReportPermission(Base):

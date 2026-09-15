@@ -17,6 +17,12 @@ api.interceptors.response.use(
 
 export default api;
 
+/** Backend retorna datetimes UTC sem sufixo Z — adiciona para o browser parsear corretamente. */
+export function parseUTC(s?: string | null): Date | null {
+  if (!s) return null;
+  return new Date(/Z|[+-]\d{2}:/.test(s) ? s : s + 'Z');
+}
+
 export function resolveImageUrl(url?: string | null, cacheBust = false): string | undefined {
   if (!url) return undefined;
   if (/^https?:\/\//i.test(url)) return cacheBust ? `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}` : url;
@@ -67,6 +73,12 @@ export const adminApi = {
       api.post<{ refreshed_at: string; row_count: number }>(`/admin/reports/${id}/refresh`),
     getData: (id: number) =>
       api.get<Record<string, unknown>[]>(`/admin/reports/${id}/data`),
+    listLogs: (id: number, limit = 30) =>
+      api.get<RefreshLog[]>(`/admin/reports/${id}/refresh-logs?limit=${limit}`),
+    updateSchedule: (id: number, cron: string | null) =>
+      api.patch<{ refresh_schedule: string | null; next_refresh_at: string | null }>(
+        `/admin/reports/${id}/schedule`, { cron }
+      ),
     listPerms: (id: number) => api.get<Permission[]>(`/admin/reports/${id}/permissions`),
     addPerm: (id: number, d: { user_id?: number; group_id?: number }) =>
       api.post<Permission>(`/admin/reports/${id}/permissions`, d),
@@ -120,8 +132,20 @@ export interface ReportCard {
 
 export interface ReportAdmin extends ReportCard {
   status: "draft" | "in_review" | "published" | "archived";
+  refresh_schedule?: string;
+  next_refresh_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface RefreshLog {
+  id: number;
+  triggered_by: string;
+  status: "success" | "error";
+  row_count?: number;
+  duration_ms?: number;
+  error_message?: string;
+  started_at: string;
 }
 
 export interface ReportCreate {

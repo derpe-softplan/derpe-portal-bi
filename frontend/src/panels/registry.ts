@@ -1,30 +1,36 @@
 import type { ComponentType } from 'react'
-import { FluxoMedicoes } from './FluxoMedicoes'
-import { FluxoMedicoesThumbnail } from './FluxoMedicoes/Thumbnail'
 
 export type PanelComponent = ComponentType<{ data: Record<string, unknown>[] }>
 export type ThumbnailComponent = ComponentType
 
-const DEFAULT_PANEL_SLUG = 'fluxo-medicoes-completa'
+type PanelModule = { Panel: PanelComponent }
+type ThumbnailModule = { Thumbnail: ThumbnailComponent }
 
-export const PANELS: Record<string, PanelComponent> = {
-  'fluxo-medicoes-completa': FluxoMedicoes,
-  'fluxo-medicoes': FluxoMedicoes,
-  'fluxo-medicoes-completo': FluxoMedicoes,
+const panelModules = import.meta.glob<PanelModule>('../reports/*/index.tsx', { eager: true })
+const thumbnailModules = import.meta.glob<ThumbnailModule>('../reports/*/Thumbnail.tsx', { eager: true })
+
+function slugFromPath(path: string): string {
+  return path.replace(/^.*\/reports\//, '').replace(/\/.*$/, '')
 }
 
-export const THUMBNAILS: Record<string, ThumbnailComponent> = {
-  'fluxo-medicoes-completa': FluxoMedicoesThumbnail,
-  'fluxo-medicoes': FluxoMedicoesThumbnail,
-  'fluxo-medicoes-completo': FluxoMedicoesThumbnail,
-}
+export const PANELS: Record<string, PanelComponent> = Object.fromEntries(
+  Object.entries(panelModules)
+    .filter(([, m]) => m.Panel)
+    .map(([path, m]) => [slugFromPath(path), m.Panel])
+)
+
+export const THUMBNAILS: Record<string, ThumbnailComponent> = Object.fromEntries(
+  Object.entries(thumbnailModules)
+    .filter(([, m]) => m.Thumbnail)
+    .map(([path, m]) => [slugFromPath(path), m.Thumbnail])
+)
 
 export function resolvePanelBySlug(slug?: string) {
   if (!slug) return undefined
-  return PANELS[slug] ?? PANELS[DEFAULT_PANEL_SLUG]
+  return PANELS[slug]
 }
 
 export function resolveThumbnailBySlug(slug?: string) {
   if (!slug) return undefined
-  return THUMBNAILS[slug] ?? THUMBNAILS[DEFAULT_PANEL_SLUG]
+  return THUMBNAILS[slug]
 }

@@ -1,10 +1,9 @@
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,11 +12,12 @@ from sqlalchemy.orm import selectinload
 from app.auth.deps import require_admin, require_publisher
 from app.auth.service import hash_password
 from app.db.models import (
-    Group, Report, ReportPermission, ReportSnapshot, ReportStatus,
+    Group, RefreshLog, Report, ReportPermission, ReportSnapshot, ReportStatus,
     User, UserGroup, UserRole,
 )
 from app.db.session import get_db
-from app.superset.client import get_client
+from apscheduler.triggers.cron import CronTrigger
+from app.reports.refresh import run_refresh, scheduler
 
 router = APIRouter()
 UPLOADS_DIR = Path(__file__).resolve().parents[2] / "uploads" / "reports"
@@ -188,6 +188,8 @@ class ReportOut(BaseModel):
     cover_image_url: Optional[str] = None
     slug: str
     status: str
+    refresh_schedule: Optional[str] = None
+    next_refresh_at: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     published_at: Optional[datetime]
@@ -209,6 +211,7 @@ class PermissionOut(BaseModel):
 
 
 def _report_to_dict(r: Report) -> dict:
+    job = scheduler.get_job(f"refresh_{r.id}")
     return {
         "id": r.id,
         "title": r.title,
@@ -216,6 +219,8 @@ def _report_to_dict(r: Report) -> dict:
         "cover_image_url": r.cover_image_url,
         "slug": r.slug,
         "status": r.status,
+        "refresh_schedule": r.refresh_schedule,
+        "next_refresh_at": job.next_run_time.isoformat() if job and job.next_run_time else None,
         "created_at": r.created_at,
         "updated_at": r.updated_at,
         "published_at": r.published_at,
@@ -318,37 +323,89 @@ async def refresh_snapshot(
     current_user: User = Depends(require_publisher),
 ):
     result = await db.execute(select(Report).where(Report.id == report_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(404, "Relatório não encontrado")
+    try:
+        return await run_refresh(report_id, triggered_by=current_user.email)
+    except Exception as exc:
+        raise HTTPException(500, f"Falha no refresh: {exc}") from exc
+
+
+class ScheduleUpdate(BaseModel):
+    cron: Optional[str] = None
+
+
+@router.patch("/reports/{report_id}/schedule")
+async def update_report_schedule(
+    report_id: int,
+    body: ScheduleUpdate,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_publisher),
+):
+    result = await db.execute(select(Report).where(Report.id == report_id))
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(404, "Relatório não encontrado")
 
-    data = await get_client().query(report.sql_query)
-    clean_data = json.loads(json.dumps(data, default=str))
+    if body.cron:
+        try:
+            CronTrigger.from_crontab(body.cron, timezone="America/Recife")
+        except Exception as exc:
+            raise HTTPException(400, f"Expressão cron inválida: {exc}") from exc
 
-    snap_result = await db.execute(
-        select(ReportSnapshot).where(ReportSnapshot.report_id == report_id)
-    )
-    snapshot = snap_result.scalar_one_or_none()
-    if snapshot:
-        snapshot.data = clean_data
-        snapshot.row_count = len(clean_data)
-        snapshot.refreshed_at = datetime.utcnow()
-        snapshot.refreshed_by_id = current_user.id
-    else:
-        snapshot = ReportSnapshot(
-            report_id=report_id,
-            data=clean_data,
-            row_count=len(clean_data),
-            refreshed_by_id=current_user.id,
-        )
-        db.add(snapshot)
-
+    report.refresh_schedule = body.cron
     await db.commit()
-    await db.refresh(snapshot)
+
+    job_id = f"refresh_{report_id}"
+    if body.cron:
+        trigger = CronTrigger.from_crontab(body.cron, timezone="America/Recife")
+        scheduler.add_job(
+            run_refresh,
+            trigger=trigger,
+            id=job_id,
+            kwargs={"report_id": report_id, "triggered_by": "scheduler"},
+            replace_existing=True,
+            misfire_grace_time=300,
+        )
+    else:
+        try:
+            scheduler.remove_job(job_id)
+        except Exception:
+            pass
+
+    job = scheduler.get_job(job_id)
     return {
-        "refreshed_at": snapshot.refreshed_at,
-        "row_count": snapshot.row_count,
+        "refresh_schedule": report.refresh_schedule,
+        "next_refresh_at": job.next_run_time.isoformat() if job and job.next_run_time else None,
     }
+
+
+@router.get("/reports/{report_id}/refresh-logs")
+async def list_refresh_logs(
+    report_id: int,
+    limit: int = Query(default=30, le=100),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_publisher),
+):
+    result = await db.execute(
+        select(RefreshLog)
+        .where(RefreshLog.report_id == report_id)
+        .order_by(RefreshLog.started_at.desc())
+        .limit(limit)
+    )
+    logs = result.scalars().all()
+    return [
+        {
+            "id": log.id,
+            "triggered_by": log.triggered_by,
+            "status": log.status,
+            "row_count": log.row_count,
+            "duration_ms": log.duration_ms,
+            "error_message": log.error_message,
+            "started_at": log.started_at,
+        }
+        for log in logs
+    ]
 
 
 @router.get("/reports/{report_id}/data")

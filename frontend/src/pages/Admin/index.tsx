@@ -1,12 +1,43 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { adminApi, resolveImageUrl, ReportAdmin, UserAdmin } from "../../services/api";
+import { adminApi, parseUTC, resolveImageUrl, ReportAdmin, RefreshLog, UserAdmin } from "../../services/api";
 import {
   Plus, Users, FileBarChart, Layers,
-  Check, X, RefreshCw, Clock,
+  Check, X, RefreshCw, Clock, CalendarClock, ChevronDown, ChevronUp, AlertCircle,
 } from "lucide-react";
 import clsx from "clsx";
+
+// ── Cron helpers ──────────────────────────────────────────────────────────────
+type Freq = "daily" | "weekdays" | "weekly" | "monthly";
+interface CronState { freq: Freq; hour: number; minute: number; weekdays: number[]; monthDay: number }
+
+function parseCron(cron: string): CronState {
+  const [min, hr, dom, , dow] = cron.trim().split(/\s+/);
+  const hour = parseInt(hr), minute = parseInt(min);
+  if (dom !== "*") return { freq: "monthly", hour, minute, weekdays: [1], monthDay: parseInt(dom) };
+  if (dow === "*") return { freq: "daily", hour, minute, weekdays: [1, 2, 3, 4, 5], monthDay: 1 };
+  if (dow === "1-5") return { freq: "weekdays", hour, minute, weekdays: [1, 2, 3, 4, 5], monthDay: 1 };
+  return { freq: "weekly", hour, minute, weekdays: dow.split(",").map(Number), monthDay: 1 };
+}
+
+function buildCron({ freq, hour, minute, weekdays, monthDay }: CronState): string {
+  const h = hour, m = minute;
+  if (freq === "daily")    return `${m} ${h} * * *`;
+  if (freq === "weekdays") return `${m} ${h} * * 1-5`;
+  if (freq === "weekly")   return `${m} ${h} * * ${[...weekdays].sort().join(",")}`;
+  return `${m} ${h} ${monthDay} * *`;
+}
+
+function describeCron(s: CronState): string {
+  const t = `${String(s.hour).padStart(2, "0")}:${String(s.minute).padStart(2, "0")}`;
+  const DAY = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  if (s.freq === "daily")    return `Todo dia às ${t}`;
+  if (s.freq === "weekdays") return `Dias úteis (seg–sex) às ${t}`;
+  if (s.freq === "weekly")   return `Toda semana em ${s.weekdays.map(d => DAY[d]).join(", ")} às ${t}`;
+  const ord = s.monthDay === 1 ? "1º" : `${s.monthDay}º`;
+  return `Todo mês no dia ${ord} às ${t}`;
+}
 
 type Tab = "users" | "groups" | "reports";
 
@@ -122,6 +153,267 @@ function UsersTab() {
   );
 }
 
+// ── Schedule modal ────────────────────────────────────────────────────────────
+function ScheduleModal({ report, onClose, onSaved }: {
+  report: ReportAdmin;
+  onClose: () => void;
+  onSaved: (refresh_schedule: string | null, next_refresh_at: string | null) => void;
+}) {
+  const qc = useQueryClient();
+  const initial: CronState = report.refresh_schedule
+    ? parseCron(report.refresh_schedule)
+    : { freq: "weekdays", hour: 6, minute: 0, weekdays: [1, 2, 3, 4, 5], monthDay: 1 };
+
+  const [state, setState] = useState<CronState>(initial);
+  const [saving, setSaving] = useState(false);
+
+  const set = (patch: Partial<CronState>) => setState(s => ({ ...s, ...patch }));
+
+  const toggleWeekday = (d: number) =>
+    set({ weekdays: state.weekdays.includes(d) ? state.weekdays.filter(x => x !== d) : [...state.weekdays, d] });
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const cron = buildCron(state);
+      const res = await adminApi.reports.updateSchedule(report.id, cron);
+      onSaved(res.data.refresh_schedule, res.data.next_refresh_at ?? null);
+      qc.invalidateQueries({ queryKey: ["admin-reports"] });
+      onClose();
+    } finally { setSaving(false); }
+  };
+
+  const handleRemove = async () => {
+    setSaving(true);
+    try {
+      await adminApi.reports.updateSchedule(report.id, null);
+      onSaved(null, null);
+      qc.invalidateQueries({ queryKey: ["admin-reports"] });
+      onClose();
+    } finally { setSaving(false); }
+  };
+
+  const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const HOURS = Array.from({ length: 24 }, (_, i) => i);
+  const MINUTES = [0, 15, 30, 45];
+  const FREQ_OPTIONS: { key: Freq; label: string; desc: string }[] = [
+    { key: "daily",    label: "Diário",      desc: "Todos os dias" },
+    { key: "weekdays", label: "Dias úteis",  desc: "Segunda a sexta" },
+    { key: "weekly",   label: "Semanal",     desc: "Dias da semana escolhidos" },
+    { key: "monthly",  label: "Mensal",      desc: "Um dia fixo por mês" },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-gray-900">Agendar atualização</h3>
+            <p className="text-xs text-gray-500 mt-0.5">{report.title}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 mt-0.5"><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-5">
+          {/* Frequência */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Frequência</p>
+            <div className="grid grid-cols-2 gap-2">
+              {FREQ_OPTIONS.map(opt => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => set({ freq: opt.key })}
+                  className={clsx(
+                    "text-left px-3 py-2.5 rounded-xl border-2 transition-colors",
+                    state.freq === opt.key
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  )}
+                >
+                  <p className={clsx("text-sm font-medium", state.freq === opt.key ? "text-blue-700" : "text-gray-700")}>{opt.label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Horário */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Horário</p>
+            <div className="flex items-center gap-2">
+              <select
+                value={state.hour}
+                onChange={e => set({ hour: parseInt(e.target.value) })}
+                className="input w-24 text-center font-mono"
+              >
+                {HOURS.map(h => <option key={h} value={h}>{String(h).padStart(2, "0")}h</option>)}
+              </select>
+              <span className="text-gray-400 font-semibold">:</span>
+              <select
+                value={state.minute}
+                onChange={e => set({ minute: parseInt(e.target.value) })}
+                className="input w-24 text-center font-mono"
+              >
+                {MINUTES.map(m => <option key={m} value={m}>{String(m).padStart(2, "0")}min</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Dias da semana (semanal) */}
+          {state.freq === "weekly" && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Dias da semana</p>
+              <div className="flex gap-1.5 flex-wrap">
+                {DAY_LABELS.map((label, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => toggleWeekday(i)}
+                    className={clsx(
+                      "w-10 h-10 rounded-full text-xs font-semibold transition-colors",
+                      state.weekdays.includes(i)
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Dia do mês (mensal) */}
+          {state.freq === "monthly" && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Dia do mês</p>
+              <select
+                value={state.monthDay}
+                onChange={e => set({ monthDay: parseInt(e.target.value) })}
+                className="input w-36"
+              >
+                {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
+                  <option key={d} value={d}>Dia {d}{d === 1 ? "º" : "º"}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Resumo */}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+            <p className="text-xs text-blue-500 font-semibold uppercase tracking-wider mb-1">Resumo</p>
+            <p className="text-sm text-blue-800 font-medium">{describeCron(state)}</p>
+            <p className="text-xs text-blue-400 font-mono mt-1">{buildCron(state)}</p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+          {report.refresh_schedule ? (
+            <button
+              onClick={handleRemove}
+              disabled={saving}
+              className="text-xs text-red-500 hover:text-red-700 transition-colors"
+            >
+              Remover agendamento
+            </button>
+          ) : <span />}
+          <div className="flex gap-2">
+            <button onClick={onClose} className="btn-secondary text-sm">Cancelar</button>
+            <button
+              onClick={handleSave}
+              disabled={saving || (state.freq === "weekly" && state.weekdays.length === 0)}
+              className="btn-primary text-sm"
+            >
+              {saving ? "Salvando..." : "Salvar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Refresh logs panel ────────────────────────────────────────────────────────
+function RefreshLogsPanel({ reportId }: { reportId: number }) {
+  const { data: logs = [], isLoading } = useQuery({
+    queryKey: ["refresh-logs", reportId],
+    queryFn: () => adminApi.reports.listLogs(reportId).then((r) => r.data),
+    refetchInterval: 30_000,
+  });
+
+  const [expandedError, setExpandedError] = useState<number | null>(null);
+
+  if (isLoading) return <div className="py-4 text-center text-xs text-gray-400">Carregando logs...</div>;
+  if (!logs.length) return <div className="py-4 text-center text-xs text-gray-400">Nenhuma execução registrada ainda.</div>;
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-gray-100">
+            <th className="py-2 pr-4 text-left font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+            <th className="py-2 pr-4 text-left font-semibold text-gray-500 uppercase tracking-wide">Início</th>
+            <th className="py-2 pr-4 text-left font-semibold text-gray-500 uppercase tracking-wide">Origem</th>
+            <th className="py-2 pr-4 text-right font-semibold text-gray-500 uppercase tracking-wide">Linhas</th>
+            <th className="py-2 text-right font-semibold text-gray-500 uppercase tracking-wide">Duração</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {logs.map((log: RefreshLog) => (
+            <>
+              <tr key={log.id} className={clsx("hover:bg-gray-50", log.status === "error" && "bg-red-50 hover:bg-red-50")}>
+                <td className="py-2 pr-4">
+                  {log.status === "success" ? (
+                    <span className="inline-flex items-center gap-1 text-green-700 bg-green-50 px-2 py-0.5 rounded-full font-medium">
+                      <Check size={10} /> OK
+                    </span>
+                  ) : (
+                    <button
+                      className="inline-flex items-center gap-1 text-red-700 bg-red-100 px-2 py-0.5 rounded-full font-medium"
+                      onClick={() => setExpandedError(expandedError === log.id ? null : log.id)}
+                    >
+                      <AlertCircle size={10} /> Erro
+                      {expandedError === log.id ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                    </button>
+                  )}
+                </td>
+                <td className="py-2 pr-4 text-gray-600 whitespace-nowrap">
+                  {parseUTC(log.started_at)?.toLocaleString("pt-BR")}
+                </td>
+                <td className="py-2 pr-4 text-gray-500">
+                  {log.triggered_by === "scheduler" ? (
+                    <span className="inline-flex items-center gap-1"><CalendarClock size={10} /> Agendado</span>
+                  ) : (
+                    <span className="truncate max-w-[140px] block" title={log.triggered_by}>{log.triggered_by}</span>
+                  )}
+                </td>
+                <td className="py-2 pr-4 text-right text-gray-600">
+                  {log.row_count != null ? log.row_count.toLocaleString("pt-BR") : "—"}
+                </td>
+                <td className="py-2 text-right text-gray-500">
+                  {log.duration_ms != null ? `${(log.duration_ms / 1000).toFixed(1)}s` : "—"}
+                </td>
+              </tr>
+              {expandedError === log.id && log.error_message && (
+                <tr key={`${log.id}-err`} className="bg-red-50">
+                  <td colSpan={5} className="pb-3 px-2">
+                    <pre className="text-xs text-red-700 bg-red-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-words">
+                      {log.error_message}
+                    </pre>
+                  </td>
+                </tr>
+              )}
+            </>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Reports tab ───────────────────────────────────────────────────────────────
 function ReportsTab() {
   const navigate = useNavigate();
@@ -148,12 +440,15 @@ function ReportsTab() {
   });
 
   const [refreshingId, setRefreshingId] = useState<number | null>(null);
+  const [logsOpenId, setLogsOpenId] = useState<number | null>(null);
+  const [schedulingReport, setSchedulingReport] = useState<ReportAdmin | null>(null);
 
   const refreshReport = async (id: number) => {
     setRefreshingId(id);
     try {
       await adminApi.reports.refresh(id);
       qc.invalidateQueries({ queryKey: ["admin-reports"] });
+      qc.invalidateQueries({ queryKey: ["refresh-logs", id] });
     } finally {
       setRefreshingId(null);
     }
@@ -290,6 +585,12 @@ function ReportsTab() {
 
   if (isLoading) return <Spinner />;
 
+  const handleScheduleSaved = (refresh_schedule: string | null, next_refresh_at: string | null) => {
+    qc.setQueryData<ReportAdmin[]>(["admin-reports"], (prev = []) =>
+      prev.map(r => r.id === schedulingReport?.id ? { ...r, refresh_schedule: refresh_schedule ?? undefined, next_refresh_at: next_refresh_at ?? undefined } : r)
+    );
+  };
+
   const nextStatus: Record<string, string | null> = {
     draft: "in_review",
     in_review: "published",
@@ -306,6 +607,14 @@ function ReportsTab() {
 
   return (
     <div>
+      {schedulingReport && (
+        <ScheduleModal
+          report={schedulingReport}
+          onClose={() => setSchedulingReport(null)}
+          onSaved={handleScheduleSaved}
+        />
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-800">Relatórios</h2>
         <button className="btn-primary flex items-center gap-1.5 text-sm" onClick={() => setShowForm(!showForm)}>
@@ -441,14 +750,15 @@ function ReportsTab() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b">
             <tr>
-              {["Título", "Status", "Dados importados", ""].map(h => (
+              {["Título", "Status", "Última atualização", "Próximo refresh", ""].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {reports.map((r: ReportAdmin) => (
-              <tr key={r.id} className="hover:bg-gray-50">
+              <React.Fragment key={r.id}>
+              <tr className="hover:bg-gray-50">
                 <td className="px-4 py-3 cursor-pointer" onClick={() => navigate(`/relatorio/${r.slug}`)}>
                   <p className="font-medium text-gray-800 hover:text-gov-blue transition-colors">{r.title}</p>
                   <p className="text-xs text-gray-400 font-mono mt-0.5">{r.slug}</p>
@@ -460,12 +770,27 @@ function ReportsTab() {
                   {r.last_refreshed_at ? (
                     <div className="flex items-center gap-1.5 text-xs text-gray-500">
                       <Clock size={12} className="text-green-500" />
-                      <span>{new Date(r.last_refreshed_at).toLocaleString("pt-BR")}</span>
+                      <span>{parseUTC(r.last_refreshed_at)?.toLocaleString("pt-BR")}</span>
+                      {r.row_count != null && (
+                        <span className="text-gray-400">({r.row_count.toLocaleString("pt-BR")} linhas)</span>
+                      )}
                     </div>
                   ) : (
                     <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                      Sem dados — clique em Atualizar
+                      Sem dados
                     </span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {r.next_refresh_at ? (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <CalendarClock size={12} className="text-blue-400" />
+                      <span>{new Date(r.next_refresh_at!).toLocaleString("pt-BR")}</span>
+                    </div>
+                  ) : r.refresh_schedule ? (
+                    <span className="text-xs text-gray-400 font-mono">{r.refresh_schedule}</span>
+                  ) : (
+                    <span className="text-xs text-gray-300">Manual</span>
                   )}
                 </td>
                 <td className="px-4 py-3">
@@ -475,6 +800,15 @@ function ReportsTab() {
                       onClick={() => openEditor(r)}
                     >
                       Configurar
+                    </button>
+
+                    <button
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition-colors border-l pl-3"
+                      onClick={() => setSchedulingReport(r)}
+                      title={r.refresh_schedule ? `Agendado: ${r.refresh_schedule}` : "Sem agendamento"}
+                    >
+                      <CalendarClock size={13} className={r.refresh_schedule ? "text-blue-400" : "text-gray-300"} />
+                      Agendar
                     </button>
 
                     <button
@@ -492,6 +826,17 @@ function ReportsTab() {
                       {refreshingId === r.id ? "Importando..." : "Atualizar dados"}
                     </button>
 
+                    <button
+                      className={clsx(
+                        "flex items-center gap-1 text-xs transition-colors border-l pl-3",
+                        logsOpenId === r.id ? "text-gray-700 font-medium" : "text-gray-400 hover:text-gray-600"
+                      )}
+                      onClick={() => setLogsOpenId(logsOpenId === r.id ? null : r.id)}
+                    >
+                      {logsOpenId === r.id ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      Logs
+                    </button>
+
                     {nextStatus[r.status] && (
                       <button
                         className="text-xs text-gray-500 hover:text-gray-800 transition-colors border-l pl-3"
@@ -503,7 +848,18 @@ function ReportsTab() {
                   </div>
                 </td>
               </tr>
-            ))}
+              {logsOpenId === r.id && (
+                <tr key={`${r.id}-logs`}>
+                  <td colSpan={5} className="bg-gray-50 px-6 py-4 border-b border-gray-100">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+                      Histórico de atualizações
+                    </p>
+                    <RefreshLogsPanel reportId={r.id} />
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          ))}
           </tbody>
         </table>
       </div>

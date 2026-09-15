@@ -7,7 +7,7 @@ const CHARTS = [
 ]
 const ROWS = [null, '#FFFBEB', null, '#FEF2F2', null]
 
-export function FluxoMedicoesThumbnail() {
+function FluxoMedicoesThumbnail() {
   return (
     <div style={{ width: '100%', height: '100%', overflow: 'hidden', background: 'linear-gradient(150deg,#EBF3FF 0%,#f8fafc 100%)', padding: '8px', boxSizing: 'border-box' }}>
       {/* KPI row */}
@@ -48,3 +48,5 @@ export function FluxoMedicoesThumbnail() {
     </div>
   )
 }
+
+export { FluxoMedicoesThumbnail as Thumbnail }

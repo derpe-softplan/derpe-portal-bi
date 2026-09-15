@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react'
 import {
   ArrowRight, AlertTriangle, Banknote, ChevronUp, ChevronDown,
-  ChevronsUpDown, Search, X, FileText, Landmark, TrendingDown,
-  CircleAlert, Building2, BarChart3, HelpCircle,
+  ChevronsUpDown, Search, X, FileText, Calendar, TrendingDown,
+  CircleAlert, Building2, BarChart3, HelpCircle, SlidersHorizontal,
 } from 'lucide-react'
 import { KpiCard } from '../../components/KpiCard'
 import { ComboBox } from '../../components/ComboBox'
@@ -17,6 +17,7 @@ export interface FluxoRow {
   num_medicao: number
   empresa: string
   rodovias: string
+  municipios: string
   natureza: string
   tipo_contrato: string | null
   diretoria: string
@@ -35,6 +36,13 @@ export interface FluxoRow {
   dt_medicao: string | null
   qt_faltam: number
   dias_na_etapa: number
+  empenho_total: number
+  valor_executado: number
+  saldo_empenho: number
+  ultimo_vlevento_contrato: number
+  dt_fim: string | null
+  dt_fim_execucao: string | null
+  saldo_insuficiente: boolean
 }
 
 // ── Mapeamento snapshot → FluxoRow ────────────────────────────────────────────
@@ -53,7 +61,14 @@ function computeDias(row: FluxoRow): number {
     case 'Liquidada':                    return daysSince(row.dt_ultima_liq)
     case 'Paga parcialmente':            return daysSince(row.dt_ultimo_pgto)
     case 'Assinatura pendente':          return daysSince(row.dt_aprovacao)
-    default:                             return daysSince(row.dt_medicao)
+    default: {
+      const base = row.dt_fim ?? row.dt_medicao
+      if (!base) return 0
+      const d = new Date(base)
+      if (isNaN(d.getTime())) return 0
+      if (row.dt_fim) d.setDate(d.getDate() + 1)
+      return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86_400_000))
+    }
   }
 }
 
@@ -66,6 +81,7 @@ export function mapSnapshot(raw: Record<string, unknown>[]): FluxoRow[] {
       num_medicao:     Number(r['Medição'] ?? 0),
       empresa:         empresaRaw.split(';')[0].trim(),
       rodovias:        String(r['Rodovias'] ?? ''),
+      municipios:      String(r['Municípios'] ?? ''),
       natureza:        String(r['Natureza'] ?? ''),
       tipo_contrato:   r['Tipo de contrato'] ? String(r['Tipo de contrato']) : null,
       diretoria:       String(r['Diretoria'] ?? ''),
@@ -82,8 +98,15 @@ export function mapSnapshot(raw: Record<string, unknown>[]): FluxoRow[] {
       dt_ultima_liq:   r['Data Última Liquidação'] ? String(r['Data Última Liquidação']) : null,
       dt_ultimo_pgto:  r['Data Último Pagamento'] ? String(r['Data Último Pagamento']) : null,
       dt_medicao:      r['Data da medição'] ? String(r['Data da medição']) : null,
+      dt_fim:          r['Data Fim'] ? String(r['Data Fim']) : null,
       qt_faltam:       Number(r['QT_FALTAM'] ?? 0),
       dias_na_etapa:   0,
+      empenho_total:   Number(r['Empenho Total'] ?? 0),
+      valor_executado: Number(r['Valor Executado'] ?? 0),
+      saldo_empenho:   Number(r['Saldo Empenho'] ?? 0),
+      ultimo_vlevento_contrato: Number(r['Último Valor Medido (Contrato)'] ?? 0),
+      dt_fim_execucao: r['Data Fim Execução'] ? String(r['Data Fim Execução']) : null,
+      saldo_insuficiente: r['Saldo para Próxima Medição'] === 'Insuficiente',
     }
     row.dias_na_etapa = computeDias(row)
     return row
@@ -176,7 +199,7 @@ function FunilCompleto({ data, activeEtapa, onEtapaClick }: {
     return ETAPAS_ORDER.map((etapa, i) => {
       const rows = data.filter(r => r.etapa_jornada === etapa)
       return { etapa, ordem: i, quantidade: rows.length, valor: rows.reduce((s, r) => s + r.vlevento, 0), percentual: Math.round(rows.length / total * 100) }
-    }).filter(e => e.quantidade > 0)
+    })
   }, [data])
 
   return (
@@ -208,22 +231,95 @@ function FunilCompleto({ data, activeEtapa, onEtapaClick }: {
   )
 }
 
+// ── Modal contratos vencendo ──────────────────────────────────────────────────
+
+type ContratoVencendo = { contrato: string; empresa: string; rodovias: string; vencimento: Date; diasRestantes: number }
+
+function ContratosVencendoModal({ contratos, onClose }: { contratos: ContratoVencendo[]; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-red-100 rounded-lg"><Calendar size={16} className="text-red-600" /></div>
+            <div>
+              <h2 className="text-base font-semibold text-gray-800">Contratos vencendo nos próximos 60 dias</h2>
+              <p className="text-xs text-gray-400">{contratos.length} contrato{contratos.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"><X size={18} /></button>
+        </div>
+        <div className="overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+              <tr>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Contrato</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Empresa</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Rodovia</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Vencimento</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Dias</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {contratos.map(c => {
+                const urgente = c.diasRestantes <= 15
+                const atencao = c.diasRestantes <= 30
+                return (
+                  <tr key={c.contrato} className="hover:bg-gray-50">
+                    <td className="px-4 py-2.5 font-mono text-xs font-semibold text-gray-700 whitespace-nowrap">{c.contrato}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-700 max-w-[200px] truncate" title={c.empresa}>{c.empresa}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{c.rodovias || '—'}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap">{c.vencimento.toLocaleDateString('pt-BR')}</td>
+                    <td className="px-4 py-2.5 whitespace-nowrap">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${urgente ? 'bg-red-100 text-red-700' : atencao ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {c.diasRestantes}d
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Alertas ───────────────────────────────────────────────────────────────────
 
-function AlertasPanel({ data, onFiltrarEtapa }: { data: FluxoRow[]; onFiltrarEtapa: (e: string) => void }) {
-  const semNota = useMemo(() => {
-    const rows = data.filter(r => r.etapa_jornada === 'Finalizada - aguardando nota')
-    const byEmpresa = Object.entries(
-      rows.reduce<Record<string, number>>((acc, r) => { acc[r.empresa] = (acc[r.empresa] ?? 0) + r.vlevento; return acc }, {})
-    ).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([empresa, valor]) => ({ empresa, valor }))
-    return { quantidade: rows.length, valor: rows.reduce((s, r) => s + r.vlevento, 0), topEmpresas: byEmpresa }
-  }, [data])
+const ETAPAS_PAGAS = new Set(['Paga parcialmente', 'Paga integralmente'])
 
-  const liquRepresadas = useMemo(() => {
-    const rows = data.filter(r => r.etapa_jornada === 'Liquidada' && r.dias_na_etapa >= 30)
-    const diasMedio = rows.length > 0 ? Math.round(rows.reduce((s, r) => s + r.dias_na_etapa, 0) / rows.length) : 0
-    return { quantidade: rows.length, valor: rows.reduce((s, r) => s + r.vlevento, 0), dias_medio: diasMedio }
-  }, [data])
+function AlertasPanel({ data, allData, onFiltrarEtapa }: { data: FluxoRow[]; allData: FluxoRow[]; onFiltrarEtapa: (e: string) => void }) {
+  const [showVencendoModal, setShowVencendoModal] = useState(false)
+
+  const saldoInsuficiente = useMemo(() => {
+    const seen = new Set<string>()
+    const contratos: FluxoRow[] = []
+    for (const r of allData) {
+      if (!seen.has(r.contrato)) { seen.add(r.contrato); contratos.push(r) }
+    }
+    const rows = contratos.filter(r => r.saldo_insuficiente)
+    return { quantidade: rows.length, saldo_total: rows.reduce((s, r) => s + r.saldo_empenho, 0) }
+  }, [allData])
+
+  const contratosVencendo = useMemo(() => {
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+    const limite = new Date(hoje); limite.setDate(hoje.getDate() + 60)
+    const seen = new Set<string>()
+    const lista: ContratoVencendo[] = []
+    for (const r of allData) {
+      if (!r.dt_fim_execucao || seen.has(r.contrato)) continue
+      seen.add(r.contrato)
+      const dt = new Date(r.dt_fim_execucao)
+      if (dt >= hoje && dt <= limite) {
+        const diasRestantes = Math.ceil((dt.getTime() - hoje.getTime()) / 86_400_000)
+        lista.push({ contrato: r.contrato, empresa: r.empresa, rodovias: r.rodovias, vencimento: dt, diasRestantes })
+      }
+    }
+    lista.sort((a, b) => a.diasRestantes - b.diasRestantes)
+    return lista
+  }, [allData])
 
   const gargalo = useMemo(() => {
     let best: { etapa: string; quantidade: number; valor: number } | null = null
@@ -236,68 +332,64 @@ function AlertasPanel({ data, onFiltrarEtapa }: { data: FluxoRow[]; onFiltrarEta
   }, [data])
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div className={`card border-l-4 ${semNota.quantidade > 0 ? 'border-l-orange-500' : 'border-l-gray-200'}`}>
-        <div className="flex items-start gap-3">
-          <div className={`p-2 rounded-lg flex-shrink-0 ${semNota.quantidade > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
-            <FileText size={16} className={semNota.quantidade > 0 ? 'text-orange-600' : 'text-gray-400'} />
+    <>
+      {showVencendoModal && <ContratosVencendoModal contratos={contratosVencendo} onClose={() => setShowVencendoModal(false)} />}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className={`card border-l-4 ${saldoInsuficiente.quantidade > 0 ? 'border-l-amber-500' : 'border-l-gray-200'}`}>
+          <div className="flex items-start gap-3">
+            <div className={`p-2 rounded-lg flex-shrink-0 ${saldoInsuficiente.quantidade > 0 ? 'bg-amber-100' : 'bg-gray-100'}`}>
+              <AlertTriangle size={16} className={saldoInsuficiente.quantidade > 0 ? 'text-amber-600' : 'text-gray-400'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Saldo Insuf. de Empenho</p>
+              <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{fmtNum(saldoInsuficiente.quantidade)}<span className="text-sm font-normal text-gray-500 ml-1.5">contratos</span></p>
+              <p className="text-xs text-gray-500 mt-0.5">Saldo disponível: {brl(saldoInsuficiente.saldo_total)}</p>
+              <p className="text-xs text-amber-600 font-semibold mt-1">Saldo {'<'} última medição</p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Aguardando Nota Fiscal</p>
-            <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{fmtNum(semNota.quantidade)}<span className="text-sm font-normal text-gray-500 ml-1.5">medições</span></p>
-            <p className="text-xs text-gray-500 mt-0.5">{brl(semNota.valor)} em aberto</p>
-            {semNota.topEmpresas.length > 0 && (
-              <div className="mt-2 space-y-0.5">
-                {semNota.topEmpresas.map(e => (
-                  <p key={e.empresa} className="text-xs text-gray-400 truncate">· {e.empresa.length > 28 ? e.empresa.slice(0, 28) + '…' : e.empresa}<span className="ml-1 text-orange-500 font-semibold">{brl(e.valor)}</span></p>
-                ))}
-              </div>
-            )}
-          </div>
+          {saldoInsuficiente.quantidade > 0 && (
+            <button onClick={() => onFiltrarEtapa('SALDO_INSUFICIENTE')} className="mt-3 w-full text-xs font-semibold text-amber-600 hover:text-amber-800 text-center py-1.5 border border-amber-200 rounded-lg hover:bg-amber-50 transition-colors">Ver medições</button>
+          )}
         </div>
-        {semNota.quantidade > 0 && (
-          <button onClick={() => onFiltrarEtapa('Finalizada - aguardando nota')} className="mt-3 w-full text-xs font-semibold text-orange-600 hover:text-orange-800 text-center py-1.5 border border-orange-200 rounded-lg hover:bg-orange-50 transition-colors">Ver medições</button>
-        )}
-      </div>
 
-      <div className={`card border-l-4 ${liquRepresadas.quantidade > 0 ? 'border-l-red-500' : 'border-l-gray-200'}`}>
-        <div className="flex items-start gap-3">
-          <div className={`p-2 rounded-lg flex-shrink-0 ${liquRepresadas.quantidade > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
-            <Landmark size={16} className={liquRepresadas.quantidade > 0 ? 'text-red-600' : 'text-gray-400'} />
+        <div className={`card border-l-4 ${contratosVencendo.length > 0 ? 'border-l-red-500' : 'border-l-gray-200'}`}>
+          <div className="flex items-start gap-3">
+            <div className={`p-2 rounded-lg flex-shrink-0 ${contratosVencendo.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+              <Calendar size={16} className={contratosVencendo.length > 0 ? 'text-red-600' : 'text-gray-400'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Vencem em 60 Dias</p>
+              <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{fmtNum(contratosVencendo.length)}<span className="text-sm font-normal text-gray-500 ml-1.5">contratos</span></p>
+              <p className="text-xs text-red-500 font-semibold mt-1">Prazo de execução próximo</p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Liquidadas há +30 dias</p>
-            <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{fmtNum(liquRepresadas.quantidade)}<span className="text-sm font-normal text-gray-500 ml-1.5">medições</span></p>
-            <p className="text-xs text-gray-500 mt-0.5">{brl(liquRepresadas.valor)} aguardando</p>
-            {liquRepresadas.dias_medio > 0 && <p className="text-xs text-red-500 font-semibold mt-1">Média: {liquRepresadas.dias_medio} dias paradas</p>}
-          </div>
+          {contratosVencendo.length > 0 && (
+            <button onClick={() => setShowVencendoModal(true)} className="mt-3 w-full text-xs font-semibold text-red-600 hover:text-red-800 text-center py-1.5 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">Ver contratos</button>
+          )}
         </div>
-        {liquRepresadas.quantidade > 0 && (
-          <button onClick={() => onFiltrarEtapa('Liquidada')} className="mt-3 w-full text-xs font-semibold text-red-600 hover:text-red-800 text-center py-1.5 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">Ver medições</button>
-        )}
-      </div>
 
-      <div className={`card border-l-4 ${gargalo ? 'border-l-violet-500' : 'border-l-gray-200'}`}>
-        <div className="flex items-start gap-3">
-          <div className={`p-2 rounded-lg flex-shrink-0 ${gargalo ? 'bg-violet-100' : 'bg-gray-100'}`}>
-            <TrendingDown size={16} className={gargalo ? 'text-violet-600' : 'text-gray-400'} />
+        <div className={`card border-l-4 ${gargalo ? 'border-l-violet-500' : 'border-l-gray-200'}`}>
+          <div className="flex items-start gap-3">
+            <div className={`p-2 rounded-lg flex-shrink-0 ${gargalo ? 'bg-violet-100' : 'bg-gray-100'}`}>
+              <TrendingDown size={16} className={gargalo ? 'text-violet-600' : 'text-gray-400'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Maior Gargalo</p>
+              {gargalo ? (
+                <>
+                  <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{fmtNum(gargalo.quantidade)}<span className="text-sm font-normal text-gray-500 ml-1.5">medições</span></p>
+                  <p className="text-xs text-violet-600 font-semibold mt-0.5">{gargalo.etapa}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{brl(gargalo.valor)} represados</p>
+                </>
+              ) : <p className="text-sm text-gray-400 mt-2">Nenhum gargalo identificado</p>}
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Maior Gargalo</p>
-            {gargalo ? (
-              <>
-                <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{fmtNum(gargalo.quantidade)}<span className="text-sm font-normal text-gray-500 ml-1.5">medições</span></p>
-                <p className="text-xs text-violet-600 font-semibold mt-0.5">{gargalo.etapa}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{brl(gargalo.valor)} represados</p>
-              </>
-            ) : <p className="text-sm text-gray-400 mt-2">Nenhum gargalo identificado</p>}
-          </div>
+          {gargalo && (
+            <button onClick={() => onFiltrarEtapa(gargalo.etapa)} className="mt-3 w-full text-xs font-semibold text-violet-600 hover:text-violet-800 text-center py-1.5 border border-violet-200 rounded-lg hover:bg-violet-50 transition-colors">Ver medições</button>
+          )}
         </div>
-        {gargalo && (
-          <button onClick={() => onFiltrarEtapa(gargalo.etapa)} className="mt-3 w-full text-xs font-semibold text-violet-600 hover:text-violet-800 text-center py-1.5 border border-violet-200 rounded-lg hover:bg-violet-50 transition-colors">Ver medições</button>
-        )}
       </div>
-    </div>
+    </>
   )
 }
 
@@ -333,7 +425,7 @@ function isCompetenciaAtrasada(value: string): boolean {
   return parsed.getTime() < cutoff.getTime()
 }
 
-function dimBarOption(items: DimItem[], color: string, activeValue?: string | null): Record<string, unknown> {
+function dimBarOption(items: DimItem[], color: string, activeValue?: string[]): Record<string, unknown> {
   const top = items.slice(0, 12)
   const labels = top.map(d => d.label)
   const values = top.map(d => d.valor)
@@ -353,10 +445,10 @@ function dimBarOption(items: DimItem[], color: string, activeValue?: string | nu
       type: 'bar', data: [...values].reverse(), barMaxWidth: 22,
       itemStyle: {
         borderRadius: [0, 4, 4, 0],
-        color: activeValue
+        color: activeValue && activeValue.length > 0
           ? (params: { dataIndex: number }) => {
               const lbl = [...labels].reverse()[params.dataIndex] ?? ''
-              return lbl.toUpperCase().includes(activeValue.toUpperCase()) ? color : color + '40'
+              return activeValue.some(v => lbl.toUpperCase().includes(v.toUpperCase())) ? color : color + '40'
             }
           : color,
       },
@@ -365,14 +457,14 @@ function dimBarOption(items: DimItem[], color: string, activeValue?: string | nu
   }
 }
 
-function dimColumnOption(items: DimItem[], color: string): Record<string, unknown> {
+function dimColumnOption(items: DimItem[]): Record<string, unknown> {
   const top = items.slice(0, 18)
   const data = top.map(item => ({
     value: item.valor,
     name: item.label,
     quantidade: item.quantidade,
     itemStyle: {
-      color: isCompetenciaAtrasada(item.rawLabel ?? item.label) ? '#ef4444' : color,
+      color: isCompetenciaAtrasada(item.rawLabel ?? item.label) ? '#ef4444' : '#22c55e',
       borderRadius: [4, 4, 0, 0],
     },
   }))
@@ -385,11 +477,11 @@ function dimColumnOption(items: DimItem[], color: string): Record<string, unknow
         return `<b>${p.name}</b><br/>Valor: <b>${brl(Number(p.value))}</b><br/>Medições: <b>${p.data.quantidade ?? 0}</b>`
       },
     },
-    grid: { left: '3%', right: '4%', bottom: '18%', top: 6, containLabel: true },
+    grid: { left: '3%', right: '4%', bottom: '26%', top: 6, containLabel: true },
     xAxis: {
       type: 'category',
       data: top.map(item => item.label),
-      axisLabel: { fontSize: 11, interval: 0, rotate: 0 },
+      axisLabel: { fontSize: 10, interval: 0, rotate: 45, hideOverlap: true },
       axisTick: { alignWithLabel: true },
     },
     yAxis: { type: 'value', axisLabel: { show: false }, splitLine: { lineStyle: { color: '#E5E7EB' } } },
@@ -404,10 +496,10 @@ function dimColumnOption(items: DimItem[], color: string): Record<string, unknow
 
 function DimChart({ title, items, color, icon, loading, onBarClick, activeValue, chartType = 'bar' }: {
   title: string; items: DimItem[]; color: string; icon: ReactNode
-  loading?: boolean; onBarClick?: (v: string) => void; activeValue?: string | null; chartType?: 'bar' | 'column'
+  loading?: boolean; onBarClick?: (v: string) => void; activeValue?: string[]; chartType?: 'bar' | 'column'
 }) {
   const height = Math.max(160, Math.min(items.length, 12) * 26 + 50)
-  const option = useMemo(() => chartType === 'column' ? dimColumnOption(items, color) : dimBarOption(items, color, activeValue), [chartType, items, color, activeValue])
+  const option = useMemo(() => chartType === 'column' ? dimColumnOption(items) : dimBarOption(items, color, activeValue), [chartType, items, color, activeValue])
   const events = useMemo(() => onBarClick ? { click: (p: unknown) => onBarClick((p as { name: string }).name) } : undefined, [onBarClick])
 
   return (
@@ -417,13 +509,17 @@ function DimChart({ title, items, color, icon, loading, onBarClick, activeValue,
           <div className="p-1.5 rounded-lg" style={{ backgroundColor: color + '18', color }}>{icon}</div>
           <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
         </div>
-        {activeValue && <span className="text-xs text-gray-400 italic truncate max-w-[140px]">filtro: {activeValue}</span>}
+        {activeValue && activeValue.length > 0 && (
+          <span className="text-xs text-gray-400 italic truncate max-w-[140px]">
+            {activeValue.length === 1 ? `filtro: ${activeValue[0]}` : `${activeValue.length} filtros`}
+          </span>
+        )}
       </div>
       {loading
         ? <div className="skeleton" style={{ height }} />
         : items.length === 0
           ? <p className="text-sm text-gray-400 py-6 text-center">Sem dados</p>
-          : <EChart option={option} height={chartType === 'column' ? Math.max(220, items.length * 32 + 50) : height} onEvents={events} className={onBarClick ? 'cursor-pointer' : ''} />
+          : <EChart option={option} height={chartType === 'column' ? 260 : height} onEvents={events} className={onBarClick ? 'cursor-pointer' : ''} />
       }
     </div>
   )
@@ -472,7 +568,14 @@ function FluxoTable({ data, localSearch, onLocalSearch }: {
   }, [data, localSearch])
 
   const sorted = useMemo(() => {
-    if (!sort.key || !sort.dir) return filtered
+    if (!sort.key || !sort.dir) {
+      return [...filtered].sort((a, b) => {
+        const aCrit = ETAPAS_CRITICAS.has(a.etapa_jornada)
+        const bCrit = ETAPAS_CRITICAS.has(b.etapa_jornada)
+        if (aCrit !== bCrit) return aCrit ? -1 : 1
+        return b.dias_na_etapa - a.dias_na_etapa
+      })
+    }
     return [...filtered].sort((a, b) => {
       const av = a[sort.key!] as string | number
       const bv = b[sort.key!] as string | number
@@ -560,38 +663,74 @@ function FluxoTable({ data, localSearch, onLocalSearch }: {
 
 function FilterBar({
   empresa, onEmpresa, rodovia, onRodovia, natureza, onNatureza,
+  municipio, onMunicipio, contrato, onContrato,
   competenciaDe, onCompetenciaDe, competenciaAte, onCompetenciaAte,
-  empresasOpts, rodoviaOpts, naturezaOpts, onLimpar, activeCount, onHelp,
+  empresasOpts, rodoviaOpts, naturezaOpts, municipioOpts, contratoOpts,
+  onLimpar, activeCount, onHelp,
 }: {
-  empresa: string | null; onEmpresa: (v: string | null) => void
-  rodovia: string | null; onRodovia: (v: string | null) => void
-  natureza: string | null; onNatureza: (v: string | null) => void
+  empresa: string[]; onEmpresa: (v: string[]) => void
+  rodovia: string[]; onRodovia: (v: string[]) => void
+  natureza: string[]; onNatureza: (v: string[]) => void
+  municipio: string[]; onMunicipio: (v: string[]) => void
+  contrato: string[]; onContrato: (v: string[]) => void
   competenciaDe: string; onCompetenciaDe: (v: string) => void
   competenciaAte: string; onCompetenciaAte: (v: string) => void
   empresasOpts: string[]; rodoviaOpts: string[]; naturezaOpts: string[]
+  municipioOpts: string[]; contratoOpts: string[]
   onLimpar: () => void; activeCount: number; onHelp: () => void
 }) {
+  const [open, setOpen] = useState(false)
+
   return (
     <div className="card">
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="w-64">
-          <ComboBox label="Empresa" value={empresa} options={empresasOpts} onChange={onEmpresa} allLabel="Todas as empresas" />
+      {/* Mobile: botão toggle */}
+      <div className="flex items-center justify-between md:hidden">
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900"
+        >
+          <SlidersHorizontal size={15} className="text-gray-500" />
+          Filtros
+          {activeCount > 0 && (
+            <span className="bg-blue-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full leading-none ml-0.5">{activeCount}</span>
+          )}
+          {open ? <ChevronUp size={14} className="text-gray-400 ml-1" /> : <ChevronDown size={14} className="text-gray-400 ml-1" />}
+        </button>
+        {activeCount > 0 && (
+          <button onClick={onLimpar} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
+            <X size={12} />Limpar
+          </button>
+        )}
+      </div>
+
+      {/* Campos de filtro: coluna no mobile, linha no desktop */}
+      <div className={`flex-col md:flex-row md:items-center gap-3 md:gap-4 md:flex-wrap ${open ? 'flex mt-4 md:mt-0' : 'hidden md:flex'}`}>
+        <div className="w-full md:w-64">
+          <ComboBox multiple label="Empresa" value={empresa} options={empresasOpts} onChange={onEmpresa} allLabel="Todas as empresas" />
         </div>
-        <div className="w-44">
-          <ComboBox label="Rodovia" value={rodovia} options={rodoviaOpts} onChange={onRodovia} allLabel="Todas" />
+        <div className="w-full md:w-44">
+          <ComboBox multiple label="Contrato" value={contrato} options={contratoOpts} onChange={onContrato} allLabel="Todos" />
         </div>
-        <div className="w-44">
-          <ComboBox label="Natureza" value={natureza} options={naturezaOpts} onChange={onNatureza} allLabel="Todas" />
+        <div className="w-full md:w-44">
+          <ComboBox multiple label="Rodovia" value={rodovia} options={rodoviaOpts} onChange={onRodovia} allLabel="Todas" />
         </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Competência de</p>
-          <MonthPicker value={competenciaDe} onChange={onCompetenciaDe} placeholder="Início" />
+        <div className="w-full md:w-44">
+          <ComboBox multiple label="Município" value={municipio} options={municipioOpts} onChange={onMunicipio} allLabel="Todos" />
         </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Até</p>
-          <MonthPicker value={competenciaAte} onChange={onCompetenciaAte} placeholder="Fim" />
+        <div className="w-full md:w-44">
+          <ComboBox multiple label="Natureza" value={natureza} options={naturezaOpts} onChange={onNatureza} allLabel="Todas" />
         </div>
-        <div className="ml-auto flex items-end gap-3 pt-6 flex-wrap">
+        <div className="flex gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Competência de</p>
+            <MonthPicker value={competenciaDe} onChange={onCompetenciaDe} placeholder="Início" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Até</p>
+            <MonthPicker value={competenciaAte} onChange={onCompetenciaAte} placeholder="Fim" />
+          </div>
+        </div>
+        <div className="md:ml-auto flex items-center gap-3 pt-0 md:pt-6 flex-wrap">
           {activeCount > 0 && (
             <button onClick={onLimpar} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
               <X size={12} />
@@ -676,12 +815,12 @@ function HelpModal({ onClose }: { onClose: () => void }) {
             <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Atenção Imediata</h3>
             <div className="space-y-2.5">
               <div>
-                <p className="font-semibold text-gray-700">Aguardando Nota Fiscal</p>
-                <p className="text-gray-500 leading-relaxed">Medições que já passaram por todas as aprovações e assinaturas mas ainda não têm nota fiscal emitida. Mostra também as top 3 empresas com maior valor represado, para facilitar a cobrança.</p>
+                <p className="font-semibold text-gray-700">Saldo Insuficiente de Empenho</p>
+                <p className="text-gray-500 leading-relaxed">Contratos onde o saldo de empenho (total empenhado menos total liquidado) é menor que o valor da última medição aprovada. Indica risco de não conseguir empenhar a próxima medição de mesma magnitude.</p>
               </div>
               <div>
-                <p className="font-semibold text-gray-700">Liquidadas há +30 dias</p>
-                <p className="text-gray-500 leading-relaxed">Medições com empenho concluído há mais de 30 dias sem pagamento. Indica represamento financeiro no DER-PE — não é problema da empresa contratada.</p>
+                <p className="font-semibold text-gray-700">Contratos com Vencimento nos Próximos 60 Dias</p>
+                <p className="text-gray-500 leading-relaxed">Contratos cujo prazo de execução vence nos próximos 60 dias. Contratos vencidos não podem receber novas medições — atenção para emissão de aditivos ou encerramento dentro do prazo.</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Maior Gargalo</p>
@@ -720,13 +859,15 @@ export function FluxoMedicoes({ data: rawData }: Props) {
   const defaultCompetenciaDe = `${currentYear}-01`
   const defaultCompetenciaAte = `${currentYear}-${currentMonth}`
 
-  const [empresa,        setEmpresa]        = useState<string | null>(null)
-  const [rodovia,        setRodovia]        = useState<string | null>(null)
-  const [natureza,       setNatureza]       = useState<string | null>(null)
+  const [empresa,        setEmpresa]        = useState<string[]>([])
+  const [rodovia,        setRodovia]        = useState<string[]>([])
+  const [natureza,       setNatureza]       = useState<string[]>([])
+  const [municipio,      setMunicipio]      = useState<string[]>([])
+  const [contrato,       setContrato]       = useState<string[]>([])
   const [competenciaDe,  setCompetenciaDe]  = useState(defaultCompetenciaDe)
   const [competenciaAte, setCompetenciaAte] = useState(defaultCompetenciaAte)
   const [etapaFiltro,    setEtapaFiltro]    = useState<string | null>(null)
-  const [diretoriaFiltro,setDiretoriaFiltro]= useState<string | null>(null)
+  const [diretoriaFiltro,setDiretoriaFiltro]= useState<string[]>([])
   const [localSearch,    setLocalSearch]    = useState('')
   const [showHelp,       setShowHelp]       = useState(false)
   const [activePage,     setActivePage]     = useState<'resumo' | 'analitico' | 'rastreio'>('resumo')
@@ -739,19 +880,29 @@ export function FluxoMedicoes({ data: rawData }: Props) {
 
   // Opções dos filtros
   const options = useMemo(() => ({
-    empresas:  [...new Set(rows.map(r => r.empresa).filter(Boolean))].sort(),
-    rodovias:  [...new Set(rows.flatMap(r => (r.rodovias || '').split(',').map(s => s.trim())).filter(Boolean))].sort(),
-    naturezas: [...new Set(rows.map(r => r.natureza).filter(Boolean))].sort(),
-    diretorias:[...new Set(rows.map(r => r.diretoria).filter(Boolean))].sort(),
+    empresas:   [...new Set(rows.map(r => r.empresa).filter(Boolean))].sort(),
+    rodovias:   [...new Set(rows.flatMap(r => (r.rodovias || '').split(',').map(s => s.trim())).filter(Boolean))].sort(),
+    naturezas:  [...new Set(rows.map(r => r.natureza).filter(Boolean))].sort(),
+    diretorias: [...new Set(rows.map(r => r.diretoria).filter(Boolean))].sort(),
+    municipios: [...new Set(rows.flatMap(r => (r.municipios || '').split(',').map(s => s.trim())).filter(Boolean))].sort(),
+    contratos:  [...new Set(rows.map(r => r.contrato).filter(Boolean))].sort(),
   }), [rows])
 
   // Filtros sem etapa (para funil e alertas)
   const filteredBase = useMemo(() => {
     return rows.filter(r => {
-      if (empresa  && r.empresa !== empresa)   return false
-      if (rodovia  && !r.rodovias.includes(rodovia)) return false
-      if (natureza && r.natureza !== natureza) return false
-      if (diretoriaFiltro && r.diretoria !== diretoriaFiltro) return false
+      if (empresa.length  > 0 && !empresa.includes(r.empresa))   return false
+      if (contrato.length > 0 && !contrato.includes(r.contrato)) return false
+      if (rodovia.length > 0) {
+        const rowRodovias = (r.rodovias || '').split(',').map(v => v.trim())
+        if (!rodovia.some(v => v === '(sem info)' ? !rowRodovias.filter(Boolean).length : rowRodovias.includes(v))) return false
+      }
+      if (natureza.length > 0 && !natureza.includes(r.natureza)) return false
+      if (municipio.length > 0) {
+        const rowMunicipios = (r.municipios || '').split(',').map(v => v.trim())
+        if (!municipio.some(v => v === '(sem info)' ? !rowMunicipios.filter(Boolean).length : rowMunicipios.includes(v))) return false
+      }
+      if (diretoriaFiltro.length > 0 && !diretoriaFiltro.includes(r.diretoria)) return false
       if (competenciaDe) {
         // mes_ano format: "MM/YYYY", filter: "YYYY-MM"
         const [mm, yyyy] = (r.mes_ano || '').split('/')
@@ -765,23 +916,33 @@ export function FluxoMedicoes({ data: rawData }: Props) {
       }
       return true
     })
-  }, [rows, empresa, rodovia, natureza, diretoriaFiltro, competenciaDe, competenciaAte])
+  }, [rows, empresa, contrato, rodovia, natureza, municipio, diretoriaFiltro, competenciaDe, competenciaAte])
 
   // Com etapa (para tabela)
   const filtered = useMemo(() => {
     if (!etapaFiltro) return filteredBase
     if (etapaFiltro === 'EM_ABERTO') return filteredBase.filter(r => ['Assinatura pendente', 'Finalizada - aguardando nota', 'Nota emitida', 'Liquidada', 'Paga parcialmente'].includes(r.etapa_jornada))
     if (etapaFiltro === 'ALERTAS_CRITICOS') return filteredBase.filter(r => ETAPAS_CRITICAS.has(r.etapa_jornada) && r.dias_na_etapa >= 30)
+    if (etapaFiltro === 'SALDO_INSUFICIENTE') return filteredBase.filter(r => r.saldo_insuficiente && !ETAPAS_PAGAS.has(r.etapa_jornada))
     return filteredBase.filter(r => r.etapa_jornada === etapaFiltro)
   }, [filteredBase, etapaFiltro])
 
-  const activeFilterCount = [empresa, rodovia, natureza, competenciaDe, competenciaAte, diretoriaFiltro].filter(Boolean).length
+  const activeFilterCount = [
+    empresa.length > 0,
+    contrato.length > 0,
+    rodovia.length > 0,
+    natureza.length > 0,
+    municipio.length > 0,
+    diretoriaFiltro.length > 0,
+    competenciaDe !== defaultCompetenciaDe,
+    competenciaAte !== defaultCompetenciaAte,
+  ].filter(Boolean).length
 
   function limpar() {
-    setEmpresa(null); setRodovia(null); setNatureza(null)
+    setEmpresa([]); setContrato([]); setRodovia([]); setNatureza([]); setMunicipio([])
     setCompetenciaDe(defaultCompetenciaDe)
     setCompetenciaAte(defaultCompetenciaAte)
-    setEtapaFiltro(null); setDiretoriaFiltro(null); setLocalSearch('')
+    setEtapaFiltro(null); setDiretoriaFiltro([]); setLocalSearch('')
   }
 
   // Dimensões (NaoPagas — etapas fechadas mas não pagas)
@@ -836,9 +997,10 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     return Object.entries(acc).map(([label, v]) => ({ label, ...v })).sort((a, b) => b.valor - a.valor)
   }
 
-  const dimEmpresa   = useMemo(() => dimItems(r => r.empresa),   [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
-  const dimRodovia   = useMemo(() => dimItemsMultiValue(r => (r.rodovias || '').split(',').map(v => v.trim())), [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
-  const dimSetor     = useMemo(() => dimItems(r => r.diretoria), [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const dimEmpresa    = useMemo(() => dimItems(r => r.empresa),   [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const dimRodovia    = useMemo(() => dimItemsMultiValue(r => (r.rodovias || '').split(',').map(v => v.trim())), [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const dimMunicipio  = useMemo(() => dimItemsMultiValue(r => (r.municipios || '').split(',').map(v => v.trim())).filter(d => d.label !== '(sem info)'), [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const dimSetor      = useMemo(() => dimItems(r => r.diretoria), [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
   const dimCompetencia = useMemo(() => {
     const acc: Record<string, { valor: number; quantidade: number }> = {}
     for (const r of naoPagasRows) {
@@ -868,8 +1030,23 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     return `${monthNames[monthIndex] ?? month}/${year}`
   }
 
-  function handleDimClick(setter: (v: string | null) => void, current: string | null, valor: string) {
-    setter(current === valor ? null : valor)
+  function handleDimClick(setter: (v: string[]) => void, current: string[], valor: string) {
+    setter(current.includes(valor) ? current.filter(x => x !== valor) : [...current, valor])
+    setLocalSearch('')
+    setActivePage('rastreio')
+    setTimeout(() => tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+  }
+
+  function handleCompetenciaClick(label: string) {
+    const item = dimCompetencia.find(d => d.label === label)
+    const raw = item?.rawLabel
+    if (!raw || raw === '(sem competência)') return
+    const [mm, yyyy] = raw.split('/')
+    if (!mm || !yyyy) return
+    const key = `${yyyy}-${mm}`
+    const isActive = competenciaDe === key && competenciaAte === key
+    setCompetenciaDe(isActive ? defaultCompetenciaDe : key)
+    setCompetenciaAte(isActive ? defaultCompetenciaAte : key)
     setLocalSearch('')
     setActivePage('rastreio')
     setTimeout(() => tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
@@ -882,6 +1059,8 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     if (!etapa) return null
     if (etapa === 'EM_ABERTO') return 'Em Aberto'
     if (etapa === 'ALERTAS_CRITICOS') return 'Alertas Críticos'
+    if (etapa === 'SALDO_INSUFICIENTE') return 'Saldo Insuficiente'
+    if (etapa === 'VENCENDO_60_DIAS') return 'Contratos Vencendo (60d)'
     return etapa
   }
 
@@ -892,12 +1071,16 @@ export function FluxoMedicoes({ data: rawData }: Props) {
       {/* Filtros */}
       <FilterBar
         empresa={empresa}               onEmpresa={setEmpresa}
+        contrato={contrato}             onContrato={setContrato}
         rodovia={rodovia}               onRodovia={setRodovia}
+        municipio={municipio}           onMunicipio={setMunicipio}
         natureza={natureza}             onNatureza={setNatureza}
         competenciaDe={competenciaDe}   onCompetenciaDe={setCompetenciaDe}
         competenciaAte={competenciaAte} onCompetenciaAte={setCompetenciaAte}
         empresasOpts={options.empresas}
+        contratoOpts={options.contratos}
         rodoviaOpts={options.rodovias}
+        municipioOpts={options.municipios}
         naturezaOpts={options.naturezas}
         onLimpar={limpar}
         activeCount={activeFilterCount}
@@ -950,7 +1133,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
 
           <div>
             <h2 className="text-sm font-semibold text-gray-700 mb-3">Atenção Imediata</h2>
-            <AlertasPanel data={filteredBase} onFiltrarEtapa={handleFiltrarEtapa} />
+            <AlertasPanel data={filteredBase} allData={rows} onFiltrarEtapa={handleFiltrarEtapa} />
           </div>
         </div>
       )}
@@ -964,12 +1147,13 @@ export function FluxoMedicoes({ data: rawData }: Props) {
             </p>
           </div>
           <div className="mt-0 mb-4">
-            <DimChart title="Por Competência" items={dimCompetencia} color="#EC4899" icon={<BarChart3 size={14} />} chartType="column" />
+            <DimChart title="Por Competência" items={dimCompetencia} color="#22c55e" icon={<BarChart3 size={14} />} chartType="column" onBarClick={handleCompetenciaClick} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <DimChart title="Por Empresa" items={dimEmpresa} color="#F97316" icon={<Building2 size={14} />} onBarClick={v => handleDimClick(setEmpresa, empresa, v)} activeValue={empresa} />
-            <DimChart title="Por Rodovia" items={dimRodovia} color="#10B981" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setRodovia, rodovia, v)} activeValue={rodovia} />
-            <DimChart title="Por Setor" items={dimSetor} color="#8B5CF6" icon={<BarChart3 size={14} />} />
+            <DimChart title="Por Empresa"    items={dimEmpresa}   color="#F97316" icon={<Building2 size={14} />} onBarClick={v => handleDimClick(setEmpresa, empresa, v)} activeValue={empresa} />
+            <DimChart title="Por Rodovia"    items={dimRodovia}   color="#10B981" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setRodovia, rodovia, v)} activeValue={rodovia} />
+            <DimChart title="Por Município"  items={dimMunicipio} color="#6366F1" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setMunicipio, municipio, v)} activeValue={municipio} />
+            <DimChart title="Por Setor"      items={dimSetor}     color="#8B5CF6" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setDiretoriaFiltro, diretoriaFiltro, v)} activeValue={diretoriaFiltro} />
           </div>
         </div>
       )}
@@ -986,7 +1170,8 @@ export function FluxoMedicoes({ data: rawData }: Props) {
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
               {etapaFiltro && <button onClick={() => setEtapaFiltro(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50"><X size={11} />{lookupEtapaLabel(etapaFiltro)}</button>}
-              {diretoriaFiltro && <button onClick={() => setDiretoriaFiltro(null)} className="flex items-center gap-1 text-xs text-emerald-600 border border-emerald-200 rounded-lg px-2.5 py-1.5 hover:bg-emerald-50"><X size={11} />{diretoriaFiltro}</button>}
+              {diretoriaFiltro.length > 0 && <button onClick={() => setDiretoriaFiltro([])} className="flex items-center gap-1 text-xs text-emerald-600 border border-emerald-200 rounded-lg px-2.5 py-1.5 hover:bg-emerald-50"><X size={11} />{diretoriaFiltro.length === 1 ? diretoriaFiltro[0] : `${diretoriaFiltro.length} setores`}</button>}
+              {municipio.length > 0 && <button onClick={() => setMunicipio([])} className="flex items-center gap-1 text-xs text-indigo-600 border border-indigo-200 rounded-lg px-2.5 py-1.5 hover:bg-indigo-50"><X size={11} />{municipio.length === 1 ? municipio[0] : `${municipio.length} municípios`}</button>}
             </div>
           </div>
           <FluxoTable data={filtered} localSearch={localSearch} onLocalSearch={setLocalSearch} />
@@ -995,3 +1180,5 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     </div>
   )
 }
+
+export { FluxoMedicoes as Panel }
