@@ -6,7 +6,7 @@ import { resolveThumbnailBySlug } from "../../panels/registry";
 
 function ReportCardItem({ report }: { report: ReportCard }) {
   const navigate = useNavigate();
-  const Thumbnail = resolveThumbnailBySlug(report.slug);
+  const Thumbnail = resolveThumbnailBySlug(report.panel_slug ?? report.slug);
   const hasData = !!report.last_refreshed_at;
 
   return (

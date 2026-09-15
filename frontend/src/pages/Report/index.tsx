@@ -11,13 +11,14 @@ function CellValue({ value }: { value: unknown }) {
 export default function ReportPage() {
   const { slug } = useParams<{ slug: string }>();
 
-  const Panel = resolvePanelBySlug(slug);
-
   const { data: meta } = useQuery({
     queryKey: ["report-meta", slug],
     queryFn: () => portalApi.getReport(slug!).then((r) => r.data),
     enabled: !!slug,
   });
+
+  // panel_slug é o nome da pasta (imutável); slug é o de URL (editável pelo admin)
+  const Panel = resolvePanelBySlug(meta?.panel_slug ?? slug);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["report-data", slug],

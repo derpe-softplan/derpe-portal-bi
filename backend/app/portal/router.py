@@ -1,9 +1,10 @@
+import json
 from typing import Any, Optional
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -41,10 +42,20 @@ def _report_card(r: Report) -> dict:
         "description": r.description,
         "cover_image_url": r.cover_image_url,
         "slug": r.slug,
+        "panel_slug": r.panel_slug,
         "published_at": r.published_at,
         "last_refreshed_at": r.snapshot.refreshed_at if r.snapshot else None,
         "row_count": r.snapshot.row_count if r.snapshot else None,
     }
+
+
+@router.get("/cronograma")
+async def get_cronograma(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict[str, dict[str, str]]:
+    result = await db.execute(text("SELECT key, value FROM cronograma_config"))
+    return {row[0]: json.loads(row[1]) for row in result.all()}
 
 
 @router.get("/reports")

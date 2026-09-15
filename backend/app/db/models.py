@@ -73,6 +73,7 @@ class Report(Base):
     slug = Column(String(100), unique=True, nullable=False, index=True)
     sql_query = Column(Text, nullable=False)
     chart_config = Column(Text)
+    panel_slug = Column(String(100), nullable=True)   # nome da pasta — imutável
     refresh_schedule = Column(String(100), nullable=True)
     status = Column(Enum(ReportStatus), nullable=False, default=ReportStatus.draft)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)

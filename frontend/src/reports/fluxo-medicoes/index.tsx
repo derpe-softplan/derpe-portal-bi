@@ -4,6 +4,9 @@ import {
   ChevronsUpDown, Search, X, FileText, Calendar, TrendingDown,
   CircleAlert, Building2, BarChart3, HelpCircle, SlidersHorizontal,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { cronogramaApi } from '../../services/api'
+import Cronograma from '../../pages/Cronograma'
 import { KpiCard } from '../../components/KpiCard'
 import { ComboBox } from '../../components/ComboBox'
 import { MonthPicker } from '../../components/MonthPicker'
@@ -70,6 +73,41 @@ function computeDias(row: FluxoRow): number {
       return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86_400_000))
     }
   }
+}
+
+// ── Integração Cronograma ─────────────────────────────────────────────────────
+
+function scheduleForComp(year: number, month: number) {
+  return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 }
+}
+
+function diasNoMes(year: number, month: number): number {
+  return new Date(year, month, 0).getDate()
+}
+
+function expectedStageToday(
+  compYear: number,
+  compMonth: number,
+  config: Record<number, string>,
+): { stage: string | null; status: 'active' | 'before' | 'after' | 'noconfig' } {
+  if (Object.keys(config).length === 0) return { stage: null, status: 'noconfig' }
+
+  const sched = scheduleForComp(compYear, compMonth)
+  const today = new Date()
+  const ty = today.getFullYear(), tm = today.getMonth() + 1, td = today.getDate()
+
+  if (ty < sched.year || (ty === sched.year && tm < sched.month)) {
+    return { stage: null, status: 'before' }
+  }
+
+  const status = (ty === sched.year && tm === sched.month) ? 'active' as const : 'after' as const
+  const refDay = status === 'active' ? td : diasNoMes(sched.year, sched.month)
+
+  // Look back to nearest configured day (weekends/holidays are blank)
+  for (let d = refDay; d >= 1; d--) {
+    if (config[d]) return { stage: config[d], status }
+  }
+  return { stage: null, status }
 }
 
 export function mapSnapshot(raw: Record<string, unknown>[]): FluxoRow[] {
@@ -143,6 +181,16 @@ const ETAPAS_ORDER = [
   'Liquidada', 'Paga parcialmente', 'Paga integralmente',
 ]
 
+// ── Utilitário de competência ─────────────────────────────────────────────────
+
+function parseMesAno(s: string): { month: number; year: number } | null {
+  if (!s) return null
+  const [mm, yyyy] = s.split('/')
+  const m = Number(mm), y = Number(yyyy)
+  if (!Number.isFinite(m) || !Number.isFinite(y) || m < 1 || m > 12) return null
+  return { month: m, year: y }
+}
+
 const FUNIL_LABELS: Record<string, string> = {
   'Criada':                       'Criada',
   'Iniciada':                     'Iniciada',
@@ -194,6 +242,12 @@ function FunilCompleto({ data, activeEtapa, onEtapaClick }: {
   activeEtapa: string | null
   onEtapaClick: (etapa: string | null) => void
 }) {
+  const { data: cronogramaRaw = {} } = useQuery({
+    queryKey: ['cronograma'],
+    queryFn: () => cronogramaApi.getAll().then(r => r.data),
+    staleTime: 5 * 60 * 1000,
+  })
+
   const funil = useMemo(() => {
     const total = data.length || 1
     return ETAPAS_ORDER.map((etapa, i) => {
@@ -202,12 +256,37 @@ function FunilCompleto({ data, activeEtapa, onEtapaClick }: {
     })
   }, [data])
 
+  const expectedByStage = useMemo(() => {
+    const result: Record<string, number> = {}
+    const byComp: Record<string, FluxoRow[]> = {}
+    for (const r of data) {
+      if (!r.mes_ano) continue
+      if (!byComp[r.mes_ano]) byComp[r.mes_ano] = []
+      byComp[r.mes_ano].push(r)
+    }
+    for (const [compStr, compRows] of Object.entries(byComp)) {
+      const parsed = parseMesAno(compStr)
+      if (!parsed) continue
+      const mk = `${parsed.year}-${String(parsed.month).padStart(2, '0')}`
+      const rawConfig = cronogramaRaw[mk] ?? {}
+      const config: Record<number, string> = Object.fromEntries(
+        Object.entries(rawConfig).map(([k, v]) => [Number(k), v])
+      )
+      const { stage } = expectedStageToday(parsed.year, parsed.month, config)
+      if (stage) result[stage] = (result[stage] ?? 0) + compRows.length
+    }
+    return result
+  }, [data, cronogramaRaw])
+
   return (
     <div className="flex items-stretch gap-1 overflow-x-auto pb-1 pt-0.5">
       {funil.map((item, i) => {
         const color = ETAPA_COLORS[item.etapa] ?? '#9CA3AF'
         const isActive = activeEtapa === item.etapa
         const isCritical = ETAPAS_CRITICAS.has(item.etapa)
+        const hasCronograma = Object.keys(expectedByStage).length > 0
+        const expected = hasCronograma ? (expectedByStage[item.etapa] ?? 0) : undefined
+        const diff = expected !== undefined ? item.quantidade - expected : null
         return (
           <div key={item.etapa} className="flex items-center gap-1 flex-1 min-w-[110px]">
             <button
@@ -220,6 +299,16 @@ function FunilCompleto({ data, activeEtapa, onEtapaClick }: {
                 {isCritical && item.quantidade > 0 && <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />}
               </div>
               <div className="text-xl font-bold text-gray-900 leading-none">{fmtNum(item.quantidade)}</div>
+              {expected !== undefined && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-[11px] text-gray-400 tabular-nums">esp: {fmtNum(expected)}</span>
+                  {diff !== null && diff !== 0 && (
+                    <span className={`text-[10px] font-bold tabular-nums ${diff > 0 ? 'text-red-400' : 'text-green-500'}`}>
+                      {diff > 0 ? `+${diff}` : diff}
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="text-xs font-semibold mt-1 leading-tight" style={{ color }}>{FUNIL_LABELS[item.etapa] ?? item.etapa}</div>
               <div className="text-xs text-gray-400 mt-0.5">{brl(item.valor)}</div>
             </button>
@@ -845,6 +934,174 @@ function HelpModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+// ── Aderência ao Cronograma ───────────────────────────────────────────────────
+
+function AderenciaCronograma({ rows }: { rows: FluxoRow[] }) {
+  const { data: cronogramaRaw = {} } = useQuery({
+    queryKey: ['cronograma'],
+    queryFn: () => cronogramaApi.getAll().then(r => r.data),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const stats = useMemo(() => {
+    // Agrupar por competência
+    const byComp: Record<string, FluxoRow[]> = {}
+    for (const r of rows) {
+      if (!r.mes_ano) continue
+      if (!byComp[r.mes_ano]) byComp[r.mes_ano] = []
+      byComp[r.mes_ano].push(r)
+    }
+
+    return Object.entries(byComp)
+      .map(([compStr, compRows]) => {
+        const parsed = parseMesAno(compStr)
+        if (!parsed) return null
+
+        const mk = `${parsed.year}-${String(parsed.month).padStart(2, '0')}`
+        const rawConfig = cronogramaRaw[mk] ?? {}
+        const config: Record<number, string> = Object.fromEntries(
+          Object.entries(rawConfig).map(([k, v]) => [Number(k), v])
+        )
+
+        const { stage, status } = expectedStageToday(parsed.year, parsed.month, config)
+        const total = compRows.length
+
+        if (status === 'noconfig') return { compStr, total, hasConfig: false, stage: null, status, atrasadas: 0, noPrazo: 0, adiantadas: 0 }
+        if (!stage) return { compStr, total, hasConfig: true, stage: null, status, atrasadas: 0, noPrazo: 0, adiantadas: 0 }
+
+        const expectedIdx = ETAPAS_ORDER.indexOf(stage)
+        let atrasadas = 0, noPrazo = 0, adiantadas = 0
+        for (const r of compRows) {
+          const ai = ETAPAS_ORDER.indexOf(r.etapa_jornada)
+          if (ai < expectedIdx) atrasadas++
+          else if (ai === expectedIdx) noPrazo++
+          else adiantadas++
+        }
+        return { compStr, total, hasConfig: true, stage, status, atrasadas, noPrazo, adiantadas }
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const [am, ay] = (a!.compStr).split('/').map(Number)
+        const [bm, by] = (b!.compStr).split('/').map(Number)
+        return (by * 100 + bm) - (ay * 100 + am)
+      })
+  }, [rows, cronogramaRaw])
+
+  const semConfig = stats.filter(s => !s?.hasConfig).length
+  const totalComps = stats.length
+
+  return (
+    <div className="space-y-4">
+      {semConfig > 0 && (
+        <div className="card border-l-4 border-l-amber-400 flex items-center gap-3 flex-wrap">
+          <AlertTriangle size={16} className="text-amber-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-gray-700">
+              {semConfig} de {totalComps} competência(s) sem cronograma configurado
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Use a grade acima para configurar a etapa esperada por dia.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="card overflow-hidden">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-gray-700">Aderência ao Cronograma</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Etapa esperada hoje vs etapa real de cada medição, por competência.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Competência</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Esperado hoje</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-red-500 uppercase tracking-wider">Atrasadas</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-green-600 uppercase tracking-wider">No prazo</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-blue-500 uppercase tracking-wider">Adiantadas</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Aderência</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {stats.map(s => {
+                if (!s) return null
+                const aderencia = s.stage && s.total > 0
+                  ? Math.round(((s.noPrazo + s.adiantadas) / s.total) * 100)
+                  : null
+                const stageColor = s.stage ? (ETAPA_COLORS[s.stage] ?? '#9CA3AF') : null
+
+                return (
+                  <tr key={s.compStr} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-semibold text-gray-700 text-xs whitespace-nowrap">{s.compStr}</td>
+                    <td className="px-4 py-3">
+                      {!s.hasConfig ? (
+                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Sem configuração</span>
+                      ) : s.status === 'before' ? (
+                        <span className="text-xs text-gray-400 italic">Período não iniciado</span>
+                      ) : !s.stage ? (
+                        <span className="text-xs text-gray-400 italic">Dia não configurado</span>
+                      ) : (
+                        <span
+                          className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: stageColor! + '20', color: stageColor! }}
+                        >
+                          {s.stage}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-gray-700 text-xs">{fmtNum(s.total)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {s.atrasadas > 0
+                        ? <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{fmtNum(s.atrasadas)}</span>
+                        : <span className="text-xs text-gray-300">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {s.noPrazo > 0
+                        ? <span className="text-xs font-semibold text-green-600">{fmtNum(s.noPrazo)}</span>
+                        : <span className="text-xs text-gray-300">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {s.adiantadas > 0
+                        ? <span className="text-xs font-semibold text-blue-500">{fmtNum(s.adiantadas)}</span>
+                        : <span className="text-xs text-gray-300">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {aderencia !== null ? (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          aderencia >= 90 ? 'bg-green-50 text-green-700' :
+                          aderencia >= 70 ? 'bg-amber-50 text-amber-700' :
+                          'bg-red-50 text-red-700'
+                        }`}>
+                          {aderencia}%
+                        </span>
+                      ) : <span className="text-xs text-gray-300">—</span>}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-400 space-y-0.5">
+          <p><span className="font-semibold text-gray-500">Esperado hoje:</span> etapa configurada no Cronograma para o dia atual no período da competência.</p>
+          <p><span className="font-semibold text-gray-500">Atrasada:</span> etapa real anterior à esperada. <span className="font-semibold text-gray-500">Adiantada:</span> etapa real posterior à esperada.</p>
+          <p><span className="font-semibold text-gray-500">Aderência:</span> (No prazo + Adiantadas) ÷ Total.</p>
+        </div>
+      </div>
+
+    </div>
+  )
+}
+
 // ── Painel principal ──────────────────────────────────────────────────────────
 
 interface Props {
@@ -870,7 +1127,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
   const [diretoriaFiltro,setDiretoriaFiltro]= useState<string[]>([])
   const [localSearch,    setLocalSearch]    = useState('')
   const [showHelp,       setShowHelp]       = useState(false)
-  const [activePage,     setActivePage]     = useState<'resumo' | 'analitico' | 'rastreio'>('resumo')
+  const [activePage, setActivePage] = useState<'resumo' | 'analitico' | 'rastreio' | 'cronograma'>('resumo')
 
   const tableRef = useRef<HTMLDivElement>(null)
 
@@ -1092,11 +1349,12 @@ export function FluxoMedicoes({ data: rawData }: Props) {
           { id: 'resumo', label: 'Resumo' },
           { id: 'analitico', label: 'Análise' },
           { id: 'rastreio', label: 'Rastreio' },
+          { id: 'cronograma', label: 'Cronograma' },
         ].map((tab) => (
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActivePage(tab.id as 'resumo' | 'analitico' | 'rastreio')}
+            onClick={() => setActivePage(tab.id as 'resumo' | 'analitico' | 'rastreio' | 'cronograma')}
             className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all ${
               activePage === tab.id
                 ? 'bg-white text-blue-700 shadow-sm ring-1 ring-blue-100'
@@ -1155,6 +1413,13 @@ export function FluxoMedicoes({ data: rawData }: Props) {
             <DimChart title="Por Município"  items={dimMunicipio} color="#6366F1" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setMunicipio, municipio, v)} activeValue={municipio} />
             <DimChart title="Por Setor"      items={dimSetor}     color="#8B5CF6" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setDiretoriaFiltro, diretoriaFiltro, v)} activeValue={diretoriaFiltro} />
           </div>
+        </div>
+      )}
+
+      {activePage === 'cronograma' && (
+        <div className="space-y-6">
+          <Cronograma compact />
+          <AderenciaCronograma rows={filteredBase} />
         </div>
       )}
 

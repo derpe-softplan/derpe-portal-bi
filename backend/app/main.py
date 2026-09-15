@@ -37,6 +37,16 @@ async def lifespan(app: FastAPI):
         await conn.execute(text(
             "ALTER TABLE reports ADD COLUMN IF NOT EXISTS refresh_schedule VARCHAR(100)"
         ))
+        await conn.execute(text(
+            "ALTER TABLE reports ADD COLUMN IF NOT EXISTS panel_slug VARCHAR(100)"
+        ))
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS cronograma_config ("
+            "  key VARCHAR(20) PRIMARY KEY,"
+            "  value TEXT NOT NULL,"
+            "  updated_at TIMESTAMP NOT NULL DEFAULT NOW()"
+            ")"
+        ))
     logger.info("Tabelas criadas/verificadas")
 
     async with AsyncSessionLocal() as session:
@@ -69,7 +79,7 @@ async def lifespan(app: FastAPI):
         for spec in CATALOG:
             try:
                 result = await session.execute(
-                    select(Report).where(Report.slug == spec.slug)
+                    select(Report).where(Report.panel_slug == spec.slug)
                 )
                 existing = result.scalar_one_or_none()
                 if not existing:
@@ -77,6 +87,7 @@ async def lifespan(app: FastAPI):
                         title=spec.title,
                         description=spec.description,
                         slug=spec.slug,
+                        panel_slug=spec.slug,
                         sql_query=spec.sql,
                         refresh_schedule=spec.refresh_schedule,
                         status=ReportStatus.in_review,
@@ -87,7 +98,8 @@ async def lifespan(app: FastAPI):
                     existing.title = spec.title
                     existing.description = spec.description
                     existing.sql_query = spec.sql
-                    # refresh_schedule não é sobrescrito — gerenciado pela UI
+                    existing.panel_slug = spec.slug  # sempre reflete o nome da pasta
+                    # slug e refresh_schedule não são sobrescritos — gerenciados pela UI
                     logger.info(f"Relatório sincronizado: '{spec.title}'")
                 await session.commit()
             except IntegrityError:

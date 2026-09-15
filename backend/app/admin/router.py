@@ -1,11 +1,12 @@
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -218,6 +219,7 @@ def _report_to_dict(r: Report) -> dict:
         "description": r.description,
         "cover_image_url": r.cover_image_url,
         "slug": r.slug,
+        "panel_slug": r.panel_slug,
         "status": r.status,
         "refresh_schedule": r.refresh_schedule,
         "next_refresh_at": job.next_run_time.isoformat() if job and job.next_run_time else None,
@@ -447,3 +449,34 @@ async def remove_permission(report_id: int, perm_id: int, db: AsyncSession = Dep
     if perm:
         await db.delete(perm)
         await db.commit()
+
+
+# ── Cronograma ────────────────────────────────────────────────────────────────
+
+@router.put("/cronograma/{key}")
+async def upsert_cronograma(
+    key: str,
+    days: dict[str, str] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_publisher),
+):
+    await db.execute(
+        text(
+            "INSERT INTO cronograma_config (key, value, updated_at) "
+            "VALUES (:key, :value, NOW()) "
+            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()"
+        ),
+        {"key": key, "value": json.dumps(days)},
+    )
+    await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/cronograma/{key}", status_code=204)
+async def delete_cronograma(
+    key: str,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_publisher),
+):
+    await db.execute(text("DELETE FROM cronograma_config WHERE key = :key"), {"key": key})
+    await db.commit()

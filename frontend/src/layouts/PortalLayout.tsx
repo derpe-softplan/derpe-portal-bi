@@ -59,18 +59,20 @@ export default function PortalLayout({
               </NavLink>
 
               {isPublisher && (
-                <NavLink
-                  to="/admin"
-                  className={({ isActive }) =>
-                    clsx(
-                      "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                      isActive ? "bg-white/20" : "hover:bg-white/10"
-                    )
-                  }
-                >
-                  <Settings size={15} />
-                  Admin
-                </NavLink>
+                <>
+                  <NavLink
+                    to="/admin"
+                    className={({ isActive }) =>
+                      clsx(
+                        "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                        isActive ? "bg-white/20" : "hover:bg-white/10"
+                      )
+                    }
+                  >
+                    <Settings size={15} />
+                    Admin
+                  </NavLink>
+                </>
               )}
             </nav>
           )}

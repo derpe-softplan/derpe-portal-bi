@@ -46,6 +46,14 @@ export const portalApi = {
   getReportData: (slug: string) => api.get<Record<string, unknown>[]>(`/portal/reports/${slug}/data`),
 };
 
+// ── Cronograma ────────────────────────────────────────────────────────────────
+export const cronogramaApi = {
+  getAll: () => api.get<Record<string, Record<string, string>>>("/portal/cronograma"),
+  save: (key: string, days: Record<string, string>) =>
+    api.put(`/admin/cronograma/${key}`, days),
+  delete: (key: string) => api.delete(`/admin/cronograma/${key}`),
+};
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 export const adminApi = {
   users: {
@@ -125,6 +133,7 @@ export interface ReportCard {
   description?: string;
   cover_image_url?: string;
   slug: string;
+  panel_slug?: string;
   published_at?: string;
   last_refreshed_at?: string;
   row_count?: number;
