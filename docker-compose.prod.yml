@@ -20,6 +20,8 @@ services:
   backend:
     image: ghcr.io/derpe-softplan/portal-backend:latest
     env_file: .env
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       - postgres
       - redis
@@ -39,3 +41,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:

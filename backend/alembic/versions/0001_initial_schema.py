@@ -4,6 +4,8 @@ Revision ID: 0001
 Revises:
 Create Date: 2026-09-16
 
+Idempotente: verifica se as tabelas já existem antes de criar.
+Necessário para bases inicializadas pelo create_all anterior ao Alembic.
 """
 from typing import Sequence, Union
 
@@ -16,7 +18,43 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _table_exists(conn, name: str) -> bool:
+    result = conn.execute(
+        sa.text(
+            "SELECT EXISTS ("
+            "  SELECT FROM information_schema.tables"
+            "  WHERE table_schema = 'public' AND table_name = :name"
+            ")"
+        ),
+        {"name": name},
+    )
+    return result.scalar()
+
+
+def _type_exists(conn, name: str) -> bool:
+    result = conn.execute(
+        sa.text("SELECT EXISTS (SELECT FROM pg_type WHERE typname = :name)"),
+        {"name": name},
+    )
+    return result.scalar()
+
+
 def upgrade() -> None:
+    conn = op.get_bind()
+
+    # Se as tabelas já existem (banco criado pelo create_all antigo), não faz nada.
+    if _table_exists(conn, "users"):
+        return
+
+    if not _type_exists(conn, "userrole"):
+        op.execute(sa.text("CREATE TYPE userrole AS ENUM ('admin', 'publisher', 'viewer')"))
+    if not _type_exists(conn, "reportstatus"):
+        op.execute(
+            sa.text(
+                "CREATE TYPE reportstatus AS ENUM ('draft', 'in_review', 'published', 'archived')"
+            )
+        )
+
     op.create_table(
         "users",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -117,13 +155,13 @@ def upgrade() -> None:
     )
 
     op.execute(
-        """
-        CREATE TABLE IF NOT EXISTS cronograma_config (
-            key VARCHAR(20) PRIMARY KEY,
-            value TEXT NOT NULL,
-            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        sa.text(
+            "CREATE TABLE IF NOT EXISTS cronograma_config ("
+            "  key VARCHAR(20) PRIMARY KEY,"
+            "  value TEXT NOT NULL,"
+            "  updated_at TIMESTAMP NOT NULL DEFAULT NOW()"
+            ")"
         )
-        """
     )
 
 
@@ -137,6 +175,6 @@ def downgrade() -> None:
     op.drop_table("groups")
     op.drop_index("ix_users_email", table_name="users")
     op.drop_table("users")
-    op.execute("DROP TABLE IF EXISTS cronograma_config")
-    op.execute("DROP TYPE IF EXISTS userrole")
-    op.execute("DROP TYPE IF EXISTS reportstatus")
+    op.execute(sa.text("DROP TABLE IF EXISTS cronograma_config"))
+    op.execute(sa.text("DROP TYPE IF EXISTS userrole"))
+    op.execute(sa.text("DROP TYPE IF EXISTS reportstatus"))
