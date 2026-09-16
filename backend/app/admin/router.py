@@ -50,13 +50,16 @@ def _encode_cover_image(file: UploadFile) -> str:
 # ── Users ─────────────────────────────────────────────────────────────────────
 
 class UserCreate(BaseModel):
-    email: str
+    username: str
+    email: str | None = None
     full_name: str
     password: str
     role: UserRole = UserRole.viewer
 
 
 class UserUpdate(BaseModel):
+    username: str | None = None
+    email: str | None = None
     full_name: str | None = None
     role: UserRole | None = None
     is_active: bool | None = None
@@ -65,7 +68,8 @@ class UserUpdate(BaseModel):
 
 class UserOut(BaseModel):
     id: int
-    email: str
+    username: str | None
+    email: str | None
     full_name: str
     role: str
     is_active: bool
@@ -81,10 +85,15 @@ async def list_users(db: AsyncSession = Depends(get_db), _=Depends(require_admin
 
 @router.post("/users", response_model=UserOut, status_code=201)
 async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db), _=Depends(require_admin)):
-    existing = await db.execute(select(User).where(User.email == body.email))
-    if existing.scalar_one_or_none():
-        raise HTTPException(400, "E-mail já cadastrado")
+    existing_u = await db.execute(select(User).where(User.username == body.username))
+    if existing_u.scalar_one_or_none():
+        raise HTTPException(400, "Nome de usuário já cadastrado")
+    if body.email:
+        existing_e = await db.execute(select(User).where(User.email == body.email))
+        if existing_e.scalar_one_or_none():
+            raise HTTPException(400, "E-mail já cadastrado")
     user = User(
+        username=body.username,
         email=body.email,
         full_name=body.full_name,
         hashed_password=hash_password(body.password),
@@ -102,6 +111,10 @@ async def update_user(user_id: int, body: UserUpdate, db: AsyncSession = Depends
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(404, "Usuário não encontrado")
+    if body.username is not None:
+        user.username = body.username
+    if body.email is not None:
+        user.email = body.email or None
     if body.full_name is not None:
         user.full_name = body.full_name
     if body.role is not None:
@@ -144,6 +157,12 @@ async def create_group(body: GroupCreate, db: AsyncSession = Depends(get_db), _=
     return group
 
 
+@router.get("/groups/{group_id}/members", response_model=list[int])
+async def list_group_members(group_id: int, db: AsyncSession = Depends(get_db), _=Depends(require_admin)):
+    result = await db.execute(select(UserGroup.user_id).where(UserGroup.group_id == group_id))
+    return [r[0] for r in result.all()]
+
+
 @router.post("/groups/{group_id}/members/{user_id}", status_code=204)
 async def add_member(group_id: int, user_id: int, db: AsyncSession = Depends(get_db), _=Depends(require_admin)):
     db.add(UserGroup(user_id=user_id, group_id=group_id))
@@ -161,6 +180,15 @@ async def remove_member(group_id: int, user_id: int, db: AsyncSession = Depends(
         await db.commit()
 
 
+@router.delete("/groups/{group_id}", status_code=204)
+async def delete_group(group_id: int, db: AsyncSession = Depends(get_db), _=Depends(require_admin)):
+    result = await db.execute(select(Group).where(Group.id == group_id))
+    group = result.scalar_one_or_none()
+    if group:
+        await db.delete(group)
+        await db.commit()
+
+
 # ── Reports ───────────────────────────────────────────────────────────────────
 
 class ReportCreate(BaseModel):
@@ -170,6 +198,8 @@ class ReportCreate(BaseModel):
     slug: str
     sql_query: str
     chart_config: str | None = None
+    sistemas: list[str] | None = None
+    tipos: list[str] | None = None
 
 
 class ReportUpdate(BaseModel):
@@ -179,6 +209,8 @@ class ReportUpdate(BaseModel):
     slug: str | None = None
     sql_query: str | None = None
     chart_config: str | None = None
+    sistemas: list[str] | None = None
+    tipos: list[str] | None = None
 
 
 class StatusChange(BaseModel):
@@ -199,6 +231,8 @@ class ReportOut(BaseModel):
     published_at: datetime | None
     last_refreshed_at: datetime | None = None
     row_count: int | None = None
+    sistemas: list[str] | None = None
+    tipos: list[str] | None = None
     model_config = {"from_attributes": True}
 
 
@@ -231,6 +265,8 @@ def _report_to_dict(r: Report) -> dict:
         "published_at": r.published_at,
         "last_refreshed_at": r.snapshot.refreshed_at if r.snapshot else None,
         "row_count": r.snapshot.row_count if r.snapshot else None,
+        "sistemas": r.sistemas or [],
+        "tipos": r.tipos or [],
     }
 
 

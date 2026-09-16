@@ -36,8 +36,8 @@ export function resolveImageUrl(url?: string | null, cacheBust = false): string 
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post<{ user: UserMe }>('/auth/login', { email, password }),
+  login: (username: string, password: string) =>
+    api.post<{ user: UserMe }>('/auth/login', { username, password }),
   logout: () => api.post('/auth/logout'),
   me: () => api.get<UserMe>('/auth/me'),
 }
@@ -73,6 +73,8 @@ export const adminApi = {
   groups: {
     list: () => api.get<Group[]>('/admin/groups'),
     create: (d: { name: string; description?: string }) => api.post<Group>('/admin/groups', d),
+    delete: (gid: number) => api.delete(`/admin/groups/${gid}`),
+    listMembers: (gid: number) => api.get<number[]>(`/admin/groups/${gid}/members`),
     addMember: (gid: number, uid: number) => api.post(`/admin/groups/${gid}/members/${uid}`),
     removeMember: (gid: number, uid: number) => api.delete(`/admin/groups/${gid}/members/${uid}`),
   },
@@ -107,7 +109,8 @@ export const adminApi = {
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface UserMe {
   id: number
-  email: string
+  username: string | null
+  email: string | null
   full_name: string
   role: 'admin' | 'publisher' | 'viewer'
 }
@@ -118,13 +121,16 @@ export interface UserAdmin extends UserMe {
 }
 
 export interface UserCreate {
-  email: string
+  username: string
+  email?: string
   full_name: string
   password: string
   role: string
 }
 
 export interface UserUpdate {
+  username?: string
+  email?: string
   full_name?: string
   role?: string
   is_active?: boolean
@@ -147,6 +153,8 @@ export interface ReportCard {
   published_at?: string
   last_refreshed_at?: string
   row_count?: number
+  sistemas?: string[]
+  tipos?: string[]
 }
 
 export interface ReportAdmin extends ReportCard {
@@ -174,6 +182,8 @@ export interface ReportCreate {
   slug: string
   sql_query: string
   chart_config?: string
+  sistemas?: string[]
+  tipos?: string[]
 }
 
 export interface MedicaoAssinatura {

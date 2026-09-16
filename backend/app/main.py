@@ -41,6 +41,7 @@ async def lifespan(app: FastAPI):
             existing_admin = result.scalar_one_or_none()
             if not existing_admin:
                 session.add(User(
+                    username=settings.admin_username,
                     email=settings.admin_email,
                     full_name="Administrador",
                     hashed_password=hash_password(settings.admin_password),
@@ -48,15 +49,17 @@ async def lifespan(app: FastAPI):
                     is_active=True,
                 ))
                 await session.commit()
-                logger.info(f"Usuário admin criado: {settings.admin_email}")
+                logger.info(f"Usuário admin criado: {settings.admin_email} (username: {settings.admin_username})")
             else:
                 existing_admin.full_name = "Administrador"
                 existing_admin.role = UserRole.admin
                 existing_admin.is_active = True
+                if not existing_admin.username:
+                    existing_admin.username = settings.admin_username
                 if not verify_password(settings.admin_password, existing_admin.hashed_password):
                     existing_admin.hashed_password = hash_password(settings.admin_password)
-                    await session.commit()
-                    logger.info(f"Senha do usuário admin sincronizada com .env para: {settings.admin_email}")
+                await session.commit()
+                logger.info(f"Admin sincronizado: {settings.admin_email} (username: {settings.admin_username})")
         except IntegrityError:
             await session.rollback()
 

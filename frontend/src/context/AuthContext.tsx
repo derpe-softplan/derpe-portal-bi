@@ -1,16 +1,18 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { authApi, UserMe } from '../services/api'
 
 interface AuthContextType {
   user: UserMe | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient()
   const [user, setUser] = useState<UserMe | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -22,13 +24,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false))
   }, [])
 
-  const login = async (email: string, password: string) => {
-    const r = await authApi.login(email, password)
+  const login = async (username: string, password: string) => {
+    const r = await authApi.login(username, password)
     setUser(r.data.user)
   }
 
   const logout = async () => {
     await authApi.logout()
+    queryClient.clear()
     setUser(null)
   }
 

@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:8080"
 
     admin_email: str = "admin@der.pe.gov.br"
+    admin_username: str = "admin"
     admin_password: str
 
     @property

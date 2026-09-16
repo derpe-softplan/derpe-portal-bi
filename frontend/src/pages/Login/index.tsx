@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,10 +15,10 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
+      await login(username, password)
       navigate('/')
     } catch {
-      setError('E-mail ou senha inválidos.')
+      setError('Usuário ou senha inválidos.')
     } finally {
       setLoading(false)
     }
@@ -128,16 +128,16 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                E-mail institucional
+                Usuário
               </label>
               <input
-                type="email"
+                type="text"
                 className="input"
-                placeholder="nome@der.pe.gov.br"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu.usuario"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
-                autoComplete="email"
+                autoComplete="username"
               />
             </div>
 

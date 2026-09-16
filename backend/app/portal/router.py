@@ -45,6 +45,8 @@ def _report_card(r: Report) -> dict:
         "published_at": r.published_at,
         "last_refreshed_at": r.snapshot.refreshed_at if r.snapshot else None,
         "row_count": r.snapshot.row_count if r.snapshot else None,
+        "sistemas": r.sistemas or [],
+        "tipos": r.tipos or [],
     }
 
 

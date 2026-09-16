@@ -1,8 +1,13 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { BarChart3, Clock, AlertCircle } from 'lucide-react'
+import clsx from 'clsx'
 import { portalApi, parseUTC, ReportCard, resolveImageUrl } from '../../services/api'
 import { resolveThumbnailBySlug } from '../../panels/registry'
+
+const SISTEMAS = ['SMO', 'CQM', 'SGF', 'SCO']
+const TIPOS = ['Obras', 'Financeiro', 'Orçamento', 'Gerencial']
 
 function ReportCardItem({ report }: { report: ReportCard }) {
   const navigate = useNavigate()
@@ -68,7 +73,34 @@ function ReportCardItem({ report }: { report: ReportCard }) {
   )
 }
 
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={clsx(
+        'px-3 py-1 rounded-full text-xs font-semibold border transition-colors',
+        active
+          ? 'bg-gov-blue text-white border-gov-blue'
+          : 'bg-white text-gray-500 border-gray-200 hover:border-gov-blue hover:text-gov-blue'
+      )}
+    >
+      {label}
+    </button>
+  )
+}
+
 export default function Portal() {
+  const [filterSistemas, setFilterSistemas] = useState<string[]>([])
+  const [filterTipos, setFilterTipos] = useState<string[]>([])
+
   const {
     data: reports,
     isLoading,
@@ -76,7 +108,21 @@ export default function Portal() {
   } = useQuery({
     queryKey: ['portal-reports'],
     queryFn: () => portalApi.listReports().then((r) => r.data),
+    staleTime: 0,
   })
+
+  const toggle = (list: string[], setList: (v: string[]) => void, value: string) =>
+    setList(list.includes(value) ? list.filter((x) => x !== value) : [...list, value])
+
+  const filtered = (reports ?? []).filter((r) => {
+    const passSistema =
+      filterSistemas.length === 0 || filterSistemas.some((s) => r.sistemas?.includes(s))
+    const passTipo =
+      filterTipos.length === 0 || filterTipos.some((t) => r.tipos?.includes(t))
+    return passSistema && passTipo
+  })
+
+  const hasFilters = filterSistemas.length > 0 || filterTipos.length > 0
 
   if (isLoading) {
     return (
@@ -96,23 +142,67 @@ export default function Portal() {
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-5">
         <h1 className="text-2xl font-semibold text-gray-900">Relatórios disponíveis</h1>
         <p className="text-sm text-gray-500 mt-1">
-          {reports?.length ?? 0} relatório(s) publicado(s) para o seu perfil
+          {filtered.length} relatório(s) publicado(s) para o seu perfil
         </p>
       </div>
 
-      {reports && reports.length > 0 ? (
+      {/* ── Filtros ─────────────────────────────────────────────────────────── */}
+      {reports && reports.length > 0 && (
+        <div className="card px-4 py-3 mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+              Sistema
+            </span>
+            {SISTEMAS.map((s) => (
+              <FilterChip
+                key={s}
+                label={s}
+                active={filterSistemas.includes(s)}
+                onClick={() => toggle(filterSistemas, setFilterSistemas, s)}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+              Tipo
+            </span>
+            {TIPOS.map((t) => (
+              <FilterChip
+                key={t}
+                label={t}
+                active={filterTipos.includes(t)}
+                onClick={() => toggle(filterTipos, setFilterTipos, t)}
+              />
+            ))}
+          </div>
+          {hasFilters && (
+            <button
+              className="ml-auto text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              onClick={() => { setFilterSistemas([]); setFilterTipos([]) }}
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      )}
+
+      {filtered.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {reports.map((r) => (
+          {filtered.map((r) => (
             <ReportCardItem key={r.id} report={r} />
           ))}
         </div>
       ) : (
         <div className="card p-12 text-center">
           <BarChart3 size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-500">Nenhum relatório disponível para o seu perfil.</p>
+          <p className="text-gray-500">
+            {hasFilters
+              ? 'Nenhum relatório corresponde aos filtros selecionados.'
+              : 'Nenhum relatório disponível para o seu perfil.'}
+          </p>
         </div>
       )}
     </div>

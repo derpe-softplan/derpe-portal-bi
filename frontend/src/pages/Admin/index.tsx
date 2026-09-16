@@ -22,6 +22,9 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  Pencil,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -89,21 +92,46 @@ function UsersTab() {
     queryFn: () => adminApi.users.list().then((r) => r.data),
   })
 
-  const toggleActive = useMutation({
-    mutationFn: (u: UserAdmin) => adminApi.users.update(u.id, { is_active: !u.is_active }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
-  })
-
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ email: '', full_name: '', password: '', role: 'viewer' })
+  const [form, setForm] = useState({ username: '', email: '', full_name: '', password: '', role: 'viewer' })
 
   const createUser = useMutation({
-    mutationFn: () => adminApi.users.create(form),
+    mutationFn: () => adminApi.users.create({ ...form, email: form.email || undefined }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-users'] })
       setShowForm(false)
-      setForm({ email: '', full_name: '', password: '', role: 'viewer' })
+      setForm({ username: '', email: '', full_name: '', password: '', role: 'viewer' })
     },
+  })
+
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState({ username: '', email: '', full_name: '', role: '', password: '' })
+
+  const openEdit = (u: UserAdmin) => {
+    setEditingId(u.id)
+    setEditForm({ username: u.username ?? '', email: u.email ?? '', full_name: u.full_name, role: u.role, password: '' })
+  }
+
+  const saveUser = useMutation({
+    mutationFn: () => {
+      const payload: Parameters<typeof adminApi.users.update>[1] = {
+        username: editForm.username || undefined,
+        full_name: editForm.full_name || undefined,
+        email: editForm.email || undefined,
+        role: editForm.role || undefined,
+      }
+      if (editForm.password) payload.password = editForm.password
+      return adminApi.users.update(editingId!, payload)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      setEditingId(null)
+    },
+  })
+
+  const toggleActive = useMutation({
+    mutationFn: (u: UserAdmin) => adminApi.users.update(u.id, { is_active: !u.is_active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   })
 
   if (isLoading) return <Spinner />
@@ -114,7 +142,7 @@ function UsersTab() {
         <h2 className="text-lg font-semibold text-gray-800">Usuários</h2>
         <button
           className="btn-primary flex items-center gap-1.5 text-sm"
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => { setShowForm(!showForm); setEditingId(null) }}
         >
           <Plus size={15} /> Novo usuário
         </button>
@@ -130,7 +158,13 @@ function UsersTab() {
           />
           <input
             className="input"
-            placeholder="E-mail"
+            placeholder="Usuário (para login)"
+            value={form.username}
+            onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+          />
+          <input
+            className="input"
+            placeholder="E-mail (opcional)"
             type="email"
             value={form.email}
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
@@ -166,7 +200,7 @@ function UsersTab() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b">
             <tr>
-              {['Nome', 'E-mail', 'Perfil', 'Ativo', ''].map((h) => (
+              {['Nome', 'Usuário', 'E-mail', 'Perfil', 'Ativo', ''].map((h) => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase"
@@ -178,39 +212,125 @@ function UsersTab() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {users.map((u) => (
-              <tr key={u.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-800">{u.full_name}</td>
-                <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={clsx(
-                      'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                      u.role === 'admin'
-                        ? 'bg-green-100 text-green-700'
-                        : u.role === 'publisher'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-gray-100 text-gray-600'
+              <React.Fragment key={u.id}>
+                <tr className={clsx('hover:bg-gray-50', editingId === u.id && 'bg-blue-50')}>
+                  <td className="px-4 py-3 font-medium text-gray-800">{u.full_name}</td>
+                  <td className="px-4 py-3 text-gray-600 font-mono text-xs">{u.username ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{u.email ?? '—'}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={clsx(
+                        'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
+                        u.role === 'admin'
+                          ? 'bg-green-100 text-green-700'
+                          : u.role === 'publisher'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-gray-100 text-gray-600'
+                      )}
+                    >
+                      {ROLE_LABELS[u.role]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.is_active ? (
+                      <Check size={16} className="text-green-500" />
+                    ) : (
+                      <X size={16} className="text-red-400" />
                     )}
-                  >
-                    {ROLE_LABELS[u.role]}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  {u.is_active ? (
-                    <Check size={16} className="text-green-500" />
-                  ) : (
-                    <X size={16} className="text-red-400" />
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                    onClick={() => toggleActive.mutate(u)}
-                  >
-                    {u.is_active ? 'Desativar' : 'Ativar'}
-                  </button>
-                </td>
-              </tr>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        title={editingId === u.id ? 'Fechar edição' : 'Editar usuário'}
+                        className={clsx(
+                          'p-1.5 rounded-lg transition-colors',
+                          editingId === u.id
+                            ? 'text-gov-blue bg-blue-100'
+                            : 'text-gray-400 hover:text-gov-blue hover:bg-blue-50'
+                        )}
+                        onClick={() => (editingId === u.id ? setEditingId(null) : openEdit(u))}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        title={u.is_active ? 'Desativar usuário' : 'Ativar usuário'}
+                        className="p-1.5 rounded-lg transition-colors hover:bg-gray-100"
+                        onClick={() => toggleActive.mutate(u)}
+                      >
+                        {u.is_active ? (
+                          <ToggleRight size={18} className="text-green-500" />
+                        ) : (
+                          <ToggleLeft size={18} className="text-gray-300" />
+                        )}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+
+                {editingId === u.id && (
+                  <tr>
+                    <td colSpan={6} className="bg-blue-50 px-4 pb-4 border-b border-blue-100">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Nome completo</label>
+                          <input
+                            className="input"
+                            value={editForm.full_name}
+                            onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Usuário (login)</label>
+                          <input
+                            className="input font-mono"
+                            value={editForm.username}
+                            onChange={(e) => setEditForm((f) => ({ ...f, username: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">E-mail (opcional)</label>
+                          <input
+                            className="input"
+                            type="email"
+                            value={editForm.email}
+                            onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Perfil</label>
+                          <select
+                            className="input"
+                            value={editForm.role}
+                            onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}
+                          >
+                            <option value="viewer">Visualizador</option>
+                            <option value="publisher">Publicador</option>
+                            <option value="admin">Administrador</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Nova senha (deixe em branco para manter)</label>
+                          <input
+                            className="input"
+                            type="password"
+                            placeholder="••••••••"
+                            value={editForm.password}
+                            onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
+                          />
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <button className="btn-primary text-sm flex items-center gap-1.5" onClick={() => saveUser.mutate()}>
+                            <Check size={14} /> Salvar
+                          </button>
+                          <button className="btn-secondary text-sm flex items-center gap-1.5" onClick={() => setEditingId(null)}>
+                            <X size={14} /> Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
@@ -638,12 +758,17 @@ function ReportsTab() {
     },
   })
 
+  const SISTEMAS = ['SMO', 'CQM', 'SGF', 'SCO']
+  const TIPOS = ['Obras', 'Financeiro', 'Orçamento', 'Gerencial']
+
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingForm, setEditingForm] = useState({
     title: '',
     description: '',
     cover_image_url: '',
     slug: '',
+    sistemas: [] as string[],
+    tipos: [] as string[],
   })
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
   const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([])
@@ -664,6 +789,8 @@ function ReportsTab() {
       description: report.description ?? '',
       cover_image_url: report.cover_image_url ?? '',
       slug: report.slug,
+      sistemas: report.sistemas ?? [],
+      tipos: report.tipos ?? [],
     })
   }
 
@@ -678,6 +805,8 @@ function ReportsTab() {
       description: current.description ?? '',
       cover_image_url: current.cover_image_url ?? '',
       slug: current.slug,
+      sistemas: current.sistemas ?? [],
+      tipos: current.tipos ?? [],
     })
 
     setSelectedUserIds(
@@ -700,6 +829,8 @@ function ReportsTab() {
         title: editingForm.title,
         description: editingForm.description,
         slug: editingForm.slug,
+        sistemas: editingForm.sistemas,
+        tipos: editingForm.tipos,
       })
 
       if (coverFile) {
@@ -914,6 +1045,64 @@ function ReportsTab() {
             <div className="space-y-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                  Sistemas
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {SISTEMAS.map((s) => (
+                    <label key={s} className={clsx(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer text-sm font-medium transition-colors',
+                      editingForm.sistemas.includes(s)
+                        ? 'bg-gov-blue text-white border-gov-blue'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gov-blue'
+                    )}>
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={editingForm.sistemas.includes(s)}
+                        onChange={() => setEditingForm((f) => ({
+                          ...f,
+                          sistemas: f.sistemas.includes(s)
+                            ? f.sistemas.filter((x) => x !== s)
+                            : [...f.sistemas, s],
+                        }))}
+                      />
+                      {s}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                  Tipo de relatório
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {TIPOS.map((t) => (
+                    <label key={t} className={clsx(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer text-sm font-medium transition-colors',
+                      editingForm.tipos.includes(t)
+                        ? 'bg-gov-blue text-white border-gov-blue'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gov-blue'
+                    )}>
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={editingForm.tipos.includes(t)}
+                        onChange={() => setEditingForm((f) => ({
+                          ...f,
+                          tipos: f.tipos.includes(t)
+                            ? f.tipos.filter((x) => x !== t)
+                            : [...f.tipos, t],
+                        }))}
+                      />
+                      {t}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
                   Perfis com acesso
                 </p>
                 <div className="space-y-2 max-h-40 overflow-auto pr-1">
@@ -954,7 +1143,7 @@ function ReportsTab() {
                           )
                         }
                       />
-                      {user.full_name} <span className="text-gray-400">({user.email})</span>
+                      {user.full_name} <span className="text-gray-400">({user.username ?? user.email})</span>
                     </label>
                   ))}
                 </div>
@@ -1115,6 +1304,166 @@ function ReportsTab() {
   )
 }
 
+// ── Groups tab ────────────────────────────────────────────────────────────────
+function GroupsTab() {
+  const qc = useQueryClient()
+  const { data: groups = [], isLoading } = useQuery({
+    queryKey: ['admin-groups'],
+    queryFn: () => adminApi.groups.list().then((r) => r.data),
+  })
+  const { data: users = [] } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: () => adminApi.users.list().then((r) => r.data),
+  })
+
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ name: '', description: '' })
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+
+  const { data: members = [] } = useQuery({
+    queryKey: ['group-members', expandedId],
+    enabled: expandedId !== null,
+    queryFn: () =>
+      expandedId === null
+        ? Promise.resolve([] as number[])
+        : adminApi.groups.listMembers(expandedId).then((r) => r.data),
+  })
+
+  const createGroup = useMutation({
+    mutationFn: () => adminApi.groups.create(form),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-groups'] })
+      setShowForm(false)
+      setForm({ name: '', description: '' })
+    },
+  })
+
+  const deleteGroup = useMutation({
+    mutationFn: (id: number) => adminApi.groups.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-groups'] })
+      setExpandedId(null)
+    },
+  })
+
+  const toggleMember = useMutation({
+    mutationFn: ({ gid, uid, add }: { gid: number; uid: number; add: boolean }) =>
+      add ? adminApi.groups.addMember(gid, uid) : adminApi.groups.removeMember(gid, uid),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['group-members', expandedId] })
+    },
+  })
+
+  if (isLoading) return <Spinner />
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-gray-800">Grupos</h2>
+        <button
+          className="btn-primary flex items-center gap-1.5 text-sm"
+          onClick={() => setShowForm(!showForm)}
+        >
+          <Plus size={15} /> Novo grupo
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="card p-5 mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input
+            className="input"
+            placeholder="Nome do grupo"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
+          <input
+            className="input"
+            placeholder="Descrição (opcional)"
+            value={form.description}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          />
+          <div className="sm:col-span-2 flex gap-2">
+            <button className="btn-primary text-sm" onClick={() => createGroup.mutate()}>
+              Criar
+            </button>
+            <button className="btn-secondary text-sm" onClick={() => setShowForm(false)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="card overflow-hidden divide-y divide-gray-100">
+        {groups.length === 0 && (
+          <p className="p-8 text-center text-gray-400 text-sm">Nenhum grupo cadastrado.</p>
+        )}
+        {groups.map((group) => (
+          <div key={group.id}>
+            <div
+              className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer"
+              onClick={() => setExpandedId(expandedId === group.id ? null : group.id)}
+            >
+              <div>
+                <p className="font-medium text-gray-800">{group.name}</p>
+                {group.description && (
+                  <p className="text-xs text-gray-400 mt-0.5">{group.description}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    deleteGroup.mutate(group.id)
+                  }}
+                >
+                  Excluir
+                </button>
+                {expandedId === group.id ? (
+                  <ChevronUp size={16} className="text-gray-400" />
+                ) : (
+                  <ChevronDown size={16} className="text-gray-400" />
+                )}
+              </div>
+            </div>
+
+            {expandedId === group.id && (
+              <div className="px-4 pb-4 bg-gray-50 border-t border-gray-100">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mt-3 mb-2">
+                  Membros
+                </p>
+                <div className="space-y-2 max-h-60 overflow-auto">
+                  {users.map((user) => {
+                    const isMember = members.includes(user.id)
+                    return (
+                      <label
+                        key={user.id}
+                        className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isMember}
+                          onChange={() =>
+                            toggleMember.mutate({ gid: group.id, uid: user.id, add: !isMember })
+                          }
+                        />
+                        {user.full_name}
+                        <span className="text-gray-400 text-xs font-mono">
+                          ({user.username ?? user.email})
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Spinner ───────────────────────────────────────────────────────────────────
 function Spinner() {
   return (
@@ -1162,9 +1511,7 @@ export default function Admin() {
       </div>
 
       {tab === 'users' && <UsersTab />}
-      {tab === 'groups' && (
-        <div className="card p-8 text-center text-gray-400">Gerenciamento de grupos em breve.</div>
-      )}
+      {tab === 'groups' && <GroupsTab />}
       {tab === 'reports' && <ReportsTab />}
     </div>
   )

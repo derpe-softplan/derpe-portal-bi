@@ -35,7 +35,8 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
-    email = Column(String(255), unique=True, nullable=False, index=True)
+    username = Column(String(100), unique=True, nullable=True, index=True)
+    email = Column(String(255), unique=True, nullable=True, index=True)
     full_name = Column(String(255), nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.viewer)
@@ -82,6 +83,8 @@ class Report(Base):
     sql_query = Column(Text, nullable=False)
     chart_config = Column(Text)
     panel_slug = Column(String(100), nullable=True)   # nome da pasta — imutável
+    sistemas = Column(JSON, nullable=True)
+    tipos = Column(JSON, nullable=True)
     refresh_schedule = Column(String(100), nullable=True)
     status = Column(Enum(ReportStatus), nullable=False, default=ReportStatus.draft)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
