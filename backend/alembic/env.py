@@ -1,10 +1,10 @@
 import asyncio
-import os
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from app.config import settings
 from app.db.base import Base
 import app.db.models  # noqa: F401 — registra todos os models no metadata
 
@@ -14,7 +14,7 @@ if config.config_file_name:
 
 target_metadata = Base.metadata
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+DATABASE_URL = settings.database_url  # postgresql+asyncpg://...
 
 
 def run_migrations_offline() -> None:
