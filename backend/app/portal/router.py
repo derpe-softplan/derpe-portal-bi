@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.auth.deps import get_current_user
 from app.db.models import Report, ReportPermission, ReportSnapshot, ReportStatus, User, UserGroup
 from app.db.session import get_db
+from app.superset.client import get_client
 
 router = APIRouter()
 
@@ -56,6 +57,34 @@ async def get_cronograma(
 ) -> dict[str, dict[str, str]]:
     result = await db.execute(text("SELECT key, value FROM cronograma_config"))
     return {row[0]: json.loads(row[1]) for row in result.all()}
+
+
+@router.get("/medicoes/{skmedicao}/assinaturas")
+async def get_medicao_assinaturas(
+    skmedicao: str,
+    _user: User = Depends(get_current_user),
+):
+    try:
+        mid = int(skmedicao)
+    except ValueError:
+        raise HTTPException(400, "ID de medição inválido")
+
+    sql = f"""SELECT DISTINCT
+    c.nutitulo,
+    c.cdtitulo,
+    m.skmedicao,
+    m.nuseqmedicaoh,
+    a.nmpapel,
+    a.nmsituacao,
+    f.nmfiscal
+FROM siderdwh.ebisfmedicaoassinatura a
+LEFT JOIN siderdwh.ebisdcontrato c ON c.skcontrato = a.skcontrato
+LEFT JOIN siderdwh.ebisdmedicaocontrato m ON a.skmedicao = m.skmedicao
+LEFT JOIN siderdwh.ebisdfiscal f ON f.skfiscal = a.skfiscal
+WHERE a.skmedicao = {mid}"""
+
+    rows = await get_client().query(sql)
+    return rows
 
 
 @router.get("/reports")

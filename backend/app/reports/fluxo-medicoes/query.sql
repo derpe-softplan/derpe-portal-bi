@@ -235,17 +235,18 @@ SELECT
     m.cdtitulo                                                             AS "Contrato",
     m.nuseqmedicaoh                                                        AS "Medição",
     m.cdtitulo || '|' || m.nuseqmedicaoh::text                             AS "MedicaoId",
+    m.skmedicao                                                            AS "SkMedicao",
     m.deobjetoresumido                                                     AS "Objeto",
     m.denaturezacontrato                                                   AS "Natureza",
     m.rodovias                                                             AS "Rodovias",
     m.municipios                                                           AS "Municípios",
     m.flaprovada                                                           AS "Aprovada?",
     CASE
-        WHEN m.flaprovada = 'N' AND COALESCE(m.vlevento, 0) = 0  THEN 'Criada'
-        WHEN m.flaprovada = 'N' AND COALESCE(m.vlevento, 0) <> 0 THEN 'Iniciada'
+        WHEN m.flaprovada IS DISTINCT FROM 'S' AND COALESCE(m.vlevento, 0) = 0  THEN 'Criada'
+        WHEN m.flaprovada IS DISTINCT FROM 'S' AND COALESCE(m.vlevento, 0) <> 0 THEN 'Iniciada'
         WHEN m.flaprovada = 'S' AND COALESCE(m.qt_faltam, 0) > 0 THEN 'Assinatura pendente'
         WHEN m.flaprovada = 'S' AND COALESCE(m.qt_faltam, 0) = 0 THEN 'Finalizada'
-        ELSE 'Indefinido'
+        ELSE 'Criada'
     END                                                                     AS "Status",
     m.dt_medicao                                                           AS "Data da medição",
     m.dt_aprovacao                                                         AS "Data da aprovação",
@@ -278,12 +279,8 @@ SELECT
              AND UPPER(m.deobjetoresumido) LIKE '%SUPERVISÃO%' THEN 'Supervisão'
         ELSE NULL
     END                                                                     AS "Tipo de contrato",
-    CASE
-        WHEN m.nmorgaosetor LIKE '%DRO%' THEN 'Distrito Rodoviário'
-        ELSE 'Setor Administrativo'
-    END                                                                     AS "Distrito/Setor",
     m.empresas                                                             AS "Empresa",
-    m.nmorgaosetor                                                         AS "Diretoria",
+    m.nmorgaosetor                                                         AS "Distrito",
     m.qt_notas                                                             AS "Qtd Notas",
     m.vlnotas                                                              AS "Valor Notas",
     m.qt_liquidacoes                                                       AS "Qtd Liquidações",
@@ -301,14 +298,16 @@ SELECT
     END                                                                     AS "Status Pagamento",
     CASE
         WHEN m.flaprovada = 'S' AND COALESCE(m.qt_faltam, 0) = 0 AND COALESCE(m.qt_notas, 0) = 0 THEN 'Finalizada - aguardando nota'
-        WHEN m.flaprovada = 'N' AND COALESCE(m.vlevento, 0) = 0  THEN 'Criada'
-        WHEN m.flaprovada = 'N' AND COALESCE(m.vlevento, 0) <> 0 THEN 'Iniciada'
+        -- flaprovada <> 'S' cobre 'N', NULL e qualquer outro valor inesperado
+        WHEN m.flaprovada IS DISTINCT FROM 'S' AND COALESCE(m.vlevento, 0) = 0  THEN 'Criada'
+        WHEN m.flaprovada IS DISTINCT FROM 'S' AND COALESCE(m.vlevento, 0) <> 0 THEN 'Iniciada'
         WHEN m.flaprovada = 'S' AND COALESCE(m.qt_faltam, 0) > 0 THEN 'Assinatura pendente'
         WHEN COALESCE(m.qt_notas, 0) > 0 AND COALESCE(m.vlliquidado, 0) = 0 THEN 'Nota emitida'
         WHEN COALESCE(m.vlliquidado, 0) > 0 AND COALESCE(m.vlpago, 0) = 0 THEN 'Liquidada'
-        WHEN COALESCE(m.vlpago, 0) > 0 AND m.vlpago < m.vlevento THEN 'Paga parcialmente'
-        WHEN COALESCE(m.vlpago, 0) >= m.vlevento AND m.vlevento > 0 THEN 'Paga integralmente'
-        ELSE 'Indefinido'
+        -- vlevento pode ser NULL (sem linha em mcc_agregado); usar COALESCE evita comparação NULL
+        WHEN COALESCE(m.vlpago, 0) > 0 AND COALESCE(m.vlpago, 0) < COALESCE(m.vlevento, 0) THEN 'Paga parcialmente'
+        WHEN COALESCE(m.vlpago, 0) > 0 THEN 'Paga integralmente'
+        ELSE 'Criada'
     END                                                                     AS "Etapa Atual da Jornada",
     m.dt_fim_execucao                                                        AS "Data Fim Execução",
     m.vlliquido_empenho                                                      AS "Empenho Total",

@@ -1,0 +1,41 @@
+# Produção — arquivo standalone (não é override do docker-compose.yml de dev).
+# Uso manual: docker compose -f docker-compose.prod.yml up -d
+# Deploy automático: GitHub Actions (push para main)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-derpe_portal}
+      POSTGRES_USER: ${POSTGRES_USER:-derpe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/derpe-softplan/portal-backend:latest
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+    dns:
+      - 8.8.8.8
+    extra_hosts:
+      - "sider.der.pe.gov.br:136.248.126.29"
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/derpe-softplan/portal-frontend:latest
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

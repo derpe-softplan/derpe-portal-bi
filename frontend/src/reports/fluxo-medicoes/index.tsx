@@ -3,9 +3,10 @@ import {
   ArrowRight, AlertTriangle, Banknote, ChevronUp, ChevronDown,
   ChevronsUpDown, Search, X, FileText, Calendar, TrendingDown,
   CircleAlert, Building2, BarChart3, HelpCircle, SlidersHorizontal,
+  ExternalLink, Loader2, CheckCircle2, Clock,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { cronogramaApi } from '../../services/api'
+import { cronogramaApi, medicaoApi, type MedicaoAssinatura } from '../../services/api'
 import Cronograma from '../../pages/Cronograma'
 import { KpiCard } from '../../components/KpiCard'
 import { ComboBox } from '../../components/ComboBox'
@@ -23,7 +24,6 @@ export interface FluxoRow {
   municipios: string
   natureza: string
   tipo_contrato: string | null
-  diretoria: string
   distrito: string
   vlevento: number
   valor_pago: number
@@ -46,6 +46,7 @@ export interface FluxoRow {
   dt_fim: string | null
   dt_fim_execucao: string | null
   saldo_insuficiente: boolean
+  skmedicao: number
 }
 
 // ── Mapeamento snapshot → FluxoRow ────────────────────────────────────────────
@@ -122,13 +123,15 @@ export function mapSnapshot(raw: Record<string, unknown>[]): FluxoRow[] {
       municipios:      String(r['Municípios'] ?? ''),
       natureza:        String(r['Natureza'] ?? ''),
       tipo_contrato:   r['Tipo de contrato'] ? String(r['Tipo de contrato']) : null,
-      diretoria:       String(r['Diretoria'] ?? ''),
-      distrito:        String(r['Distrito/Setor'] ?? ''),
+      distrito:        String(r['Distrito'] ?? ''),
       vlevento:        Number(r['Valor Medido Reajustado'] ?? 0),
       valor_pago:      Number(r['Valor Pago'] ?? 0),
       valor_liquidado: Number(r['Valor Liquidado'] ?? 0),
       qtd_notas:       Number(r['Qtd Notas'] ?? 0),
-      etapa_jornada:   String(r['Etapa Atual da Jornada'] ?? ''),
+      etapa_jornada: (() => {
+        const e = String(r['Etapa Atual da Jornada'] ?? '')
+        return ETAPAS_ORDER.includes(e) ? e : 'Criada'
+      })(),
       status_pgto:     String(r['Status Pagamento'] ?? ''),
       mes_ano:         String(r['Mês/Ano'] ?? ''),
       dt_aprovacao:    r['Data da aprovação'] ? String(r['Data da aprovação']) : null,
@@ -145,6 +148,7 @@ export function mapSnapshot(raw: Record<string, unknown>[]): FluxoRow[] {
       ultimo_vlevento_contrato: Number(r['Último Valor Medido (Contrato)'] ?? 0),
       dt_fim_execucao: r['Data Fim Execução'] ? String(r['Data Fim Execução']) : null,
       saldo_insuficiente: r['Saldo para Próxima Medição'] === 'Insuficiente',
+      skmedicao:       Number(r['SkMedicao'] ?? 0),
     }
     row.dias_na_etapa = computeDias(row)
     return row
@@ -191,16 +195,6 @@ function parseMesAno(s: string): { month: number; year: number } | null {
   return { month: m, year: y }
 }
 
-const FUNIL_LABELS: Record<string, string> = {
-  'Criada':                       'Criada',
-  'Iniciada':                     'Iniciada',
-  'Assinatura pendente':          'Assin. Pendente',
-  'Finalizada - aguardando nota': 'Ag. Nota',
-  'Nota emitida':                 'Nota Emitida',
-  'Liquidada':                    'Liquidada',
-  'Paga parcialmente':            'Paga Parc.',
-  'Paga integralmente':           'Paga Integr.',
-}
 
 const ETAPAS_CRITICAS = new Set([
   'Finalizada - aguardando nota', 'Nota emitida', 'Liquidada', 'Paga parcialmente',
@@ -235,12 +229,357 @@ function diasBadge(etapa: string, dias: number) {
   return <span className={`text-xs px-2 py-0.5 rounded-full ${cls}`}>{dias}d</span>
 }
 
-// ── Funil ─────────────────────────────────────────────────────────────────────
+// ── Modal de Detalhes da Medição ──────────────────────────────────────────────
 
-function FunilCompleto({ data, activeEtapa, onEtapaClick }: {
+const fmtDate = (s: string | null | undefined) => {
+  if (!s) return '—'
+  const d = new Date(/Z|[+-]\d{2}:/.test(s) ? s : s + 'Z')
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR')
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{label}</dt>
+      <dd className="text-sm text-gray-800 mt-0.5 leading-snug">{children ?? <span className="text-gray-300">—</span>}</dd>
+    </div>
+  )
+}
+
+function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) {
+  const [tab, setTab] = useState<'detalhes' | 'assinaturas'>('detalhes')
+
+  const { data: assinaturas = [], isLoading } = useQuery({
+    queryKey: ['medicao-assinaturas', row.skmedicao],
+    queryFn: () => medicaoApi.getAssinaturas(String(row.skmedicao)).then(r => r.data),
+    staleTime: 2 * 60 * 1000,
+    enabled: !!row.skmedicao,
+  })
+
+  const siderUrl = useMemo(() => {
+    const first = assinaturas.find(a => a.nutitulo && a.nuseqmedicaoh)
+    if (!first) return null
+    return `https://sider.der.pe.gov.br/smo/editarMedicaohsmo.do?entity.qyMedicao.medicaohPK.nuSeqmedicaoh=${first.nuseqmedicaoh}&entity.qyMedicao.medicaohPK.nuTitulo=${first.nutitulo}`
+  }, [assinaturas])
+
+  const validAssinaturas = assinaturas.filter(a => a.nmpapel)
+  const pendentes = validAssinaturas.filter(a => a.nmsituacao !== 'ASSINADO')
+  const assinados = validAssinaturas.filter(a => a.nmsituacao === 'ASSINADO')
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Cabeçalho */}
+        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-100">
+          <div className="min-w-0">
+            <p className="text-base font-bold text-gray-900 truncate">{row.empresa}</p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap text-xs text-gray-500">
+              <span className="font-mono font-semibold text-gray-700">{row.contrato}</span>
+              <span className="text-gray-300">·</span>
+              <span>Medição #{row.num_medicao}</span>
+              <span className="text-gray-300">·</span>
+              <span>Comp. {row.mes_ano}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isLoading && <Loader2 size={14} className="text-gray-400 animate-spin" />}
+            {siderUrl && (
+              <a
+                href={siderUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-gov-blue hover:bg-gov-blue-dark px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+              >
+                <ExternalLink size={12} />
+                Abrir no SIDER
+              </a>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Abas */}
+        <div className="flex border-b border-gray-100 px-6">
+          {[
+            { id: 'detalhes',    label: 'Detalhes' },
+            { id: 'assinaturas', label: `Assinaturas${validAssinaturas.length ? ` (${validAssinaturas.length})` : ''}` },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id as 'detalhes' | 'assinaturas')}
+              className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+                tab === t.id
+                  ? 'border-gov-blue text-gov-blue'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Conteúdo */}
+        <div className="flex-1 overflow-y-auto p-6">
+
+          {/* ── Detalhes ── */}
+          {tab === 'detalhes' && (
+            <div className="space-y-5">
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Situação atual</p>
+                <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
+                  <Field label="Etapa">{etapaBadge(row.etapa_jornada)}</Field>
+                  <Field label="Dias na etapa">{diasBadge(row.etapa_jornada, row.dias_na_etapa)}</Field>
+                  {row.qt_faltam > 0 && (
+                    <Field label="Assinaturas pendentes">
+                      <span className="text-sm font-semibold text-amber-600">{row.qt_faltam} faltando</span>
+                    </Field>
+                  )}
+                </dl>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Identificação</p>
+                <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
+                  <Field label="Contrato">{row.contrato}</Field>
+                  <Field label="Medição">#{row.num_medicao}</Field>
+                  <Field label="Competência">{row.mes_ano}</Field>
+                  <Field label="Natureza">{row.natureza}</Field>
+                  <Field label="Tipo de contrato">{row.tipo_contrato}</Field>
+                  <Field label="Distrito">{row.distrito}</Field>
+                  <div className="col-span-2">
+                    <Field label="Rodovias">{row.rodovias}</Field>
+                  </div>
+                  <div className="col-span-2">
+                    <Field label="Municípios">{row.municipios}</Field>
+                  </div>
+                </dl>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Financeiro</p>
+                <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
+                  <Field label="Valor medido">{brlFull(row.vlevento)}</Field>
+                  <Field label="Valor liquidado">{brlFull(row.valor_liquidado)}</Field>
+                  <Field label="Valor pago">{brlFull(row.valor_pago)}</Field>
+                  <Field label="Empenho total">{brlFull(row.empenho_total)}</Field>
+                  <Field label="Saldo de empenho">
+                    <span className={row.saldo_insuficiente ? 'text-red-600 font-semibold' : ''}>
+                      {brlFull(row.saldo_empenho)}
+                      {row.saldo_insuficiente && ' ⚠ Insuficiente'}
+                    </span>
+                  </Field>
+                  <Field label="Valor executado">{brlFull(row.valor_executado)}</Field>
+                </dl>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Datas</p>
+                <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
+                  <Field label="Data da medição">{fmtDate(row.dt_medicao)}</Field>
+                  <Field label="Aprovação">{fmtDate(row.dt_aprovacao)}</Field>
+                  <Field label="Envio SEI">{fmtDate(row.dt_envio_sei)}</Field>
+                  <Field label="Última liquidação">{fmtDate(row.dt_ultima_liq)}</Field>
+                  <Field label="Último pagamento">{fmtDate(row.dt_ultimo_pgto)}</Field>
+                  <Field label="Fim do contrato">{fmtDate(row.dt_fim)}</Field>
+                </dl>
+              </div>
+            </div>
+          )}
+
+          {/* ── Assinaturas ── */}
+          {tab === 'assinaturas' && (
+            <div>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 size={24} className="text-gray-400 animate-spin" />
+                </div>
+              ) : validAssinaturas.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-sm text-gray-400">Nenhuma assinatura encontrada para esta medição.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="flex items-center gap-1.5 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full font-semibold">
+                      <CheckCircle2 size={14} />
+                      {assinados.length} assinado{assinados.length !== 1 ? 's' : ''}
+                    </span>
+                    {pendentes.length > 0 && (
+                      <span className="flex items-center gap-1.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full font-semibold">
+                        <Clock size={14} />
+                        {pendentes.length} pendente{pendentes.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Papel</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Fiscal</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Situação</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {validAssinaturas.map((a: MedicaoAssinatura, i: number) => {
+                          const assinado = a.nmsituacao === 'ASSINADO'
+                          return (
+                            <tr key={i} className={assinado ? '' : 'bg-amber-50/40'}>
+                              <td className="px-4 py-3 text-sm text-gray-700">{a.nmpapel ?? '—'}</td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-800">{a.nmfiscal ?? '—'}</td>
+                              <td className="px-4 py-3">
+                                {assinado ? (
+                                  <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                                    <CheckCircle2 size={13} /> Assinado
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600">
+                                    <Clock size={13} /> Pendente
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal de drill-down do funil ──────────────────────────────────────────────
+
+function DrillModal({ expectedStage, rows, onClose, onRowClick }: {
+  expectedStage: string
+  rows: FluxoRow[]
+  onClose: () => void
+  onRowClick?: (row: FluxoRow) => void
+}) {
+  const expectedIdx = ETAPAS_ORDER.indexOf(expectedStage)
+
+  const sortedGroups = useMemo(() => {
+    const groups: Record<string, FluxoRow[]> = {}
+    for (const r of rows) {
+      if (!groups[r.etapa_jornada]) groups[r.etapa_jornada] = []
+      groups[r.etapa_jornada].push(r)
+    }
+    return Object.entries(groups).sort((a, b) =>
+      ETAPAS_ORDER.indexOf(a[0]) - ETAPAS_ORDER.indexOf(b[0])
+    )
+  }, [rows])
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-100">
+          <div>
+            <p className="text-base font-bold text-gray-900">
+              Esperado:{' '}
+              <span style={{ color: ETAPA_COLORS[expectedStage] ?? '#6B7280' }}>{expectedStage}</span>
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {rows.length} {rows.length !== 1 ? 'medições' : 'medição'} · clique em uma linha para ver detalhes
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {sortedGroups.map(([etapa, etapaRows]) => {
+            const idx = ETAPAS_ORDER.indexOf(etapa)
+            const status = idx < expectedIdx ? 'atrasada' : idx === expectedIdx ? 'no-prazo' : 'adiantada'
+            const [statusLabel, statusClass] =
+              status === 'atrasada'  ? ['Atrasada',  'bg-red-50 text-red-700 border-red-200'] :
+              status === 'adiantada' ? ['Adiantada', 'bg-blue-50 text-blue-700 border-blue-200'] :
+                                       ['No prazo',  'bg-emerald-50 text-emerald-700 border-emerald-200']
+
+            return (
+              <div key={etapa}>
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  {etapaBadge(etapa)}
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${statusClass}`}>
+                    {statusLabel}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {etapaRows.length} {etapaRows.length !== 1 ? 'medições' : 'medição'}
+                  </span>
+                </div>
+                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider">Empresa</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider">Contrato</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider">Comp.</th>
+                        <th className="px-3 py-2 text-right font-semibold text-gray-500 uppercase tracking-wider">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {etapaRows.map(r => (
+                        <tr
+                          key={r.id}
+                          className="hover:bg-gray-50 cursor-pointer transition-colors"
+                          onClick={() => { onRowClick?.(r); onClose() }}
+                        >
+                          <td className="px-3 py-2 max-w-[160px]">
+                            <span className="block truncate font-medium text-gray-800" title={r.empresa}>{r.empresa || '—'}</span>
+                          </td>
+                          <td className="px-3 py-2 font-mono text-gray-600 whitespace-nowrap">
+                            {r.contrato} <span className="text-gray-400">#{r.num_medicao}</span>
+                          </td>
+                          <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.mes_ano}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-gray-700 whitespace-nowrap">{brl(r.vlevento)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Jornada Completa ──────────────────────────────────────────────────────────
+
+function FunilCompleto({ data, activeEtapa, onEtapaClick, onRowClick }: {
   data: FluxoRow[]
   activeEtapa: string | null
   onEtapaClick: (etapa: string | null) => void
+  onRowClick?: (row: FluxoRow) => void
 }) {
   const { data: cronogramaRaw = {} } = useQuery({
     queryKey: ['cronograma'],
@@ -250,14 +589,20 @@ function FunilCompleto({ data, activeEtapa, onEtapaClick }: {
 
   const funil = useMemo(() => {
     const total = data.length || 1
-    return ETAPAS_ORDER.map((etapa, i) => {
-      const rows = data.filter(r => r.etapa_jornada === etapa)
-      return { etapa, ordem: i, quantidade: rows.length, valor: rows.reduce((s, r) => s + r.vlevento, 0), percentual: Math.round(rows.length / total * 100) }
+    return ETAPAS_ORDER.map(etapa => {
+      const etapaRows = data.filter(r => r.etapa_jornada === etapa)
+      return {
+        etapa,
+        quantidade: etapaRows.length,
+        valor: etapaRows.reduce((s, r) => s + r.vlevento, 0),
+        percentual: Math.round(etapaRows.length / total * 100),
+      }
     })
   }, [data])
 
-  const expectedByStage = useMemo(() => {
-    const result: Record<string, number> = {}
+  const { expectedByStage, rowsByExpectedStage } = useMemo(() => {
+    const expectedByStage: Record<string, number> = {}
+    const rowsByExpectedStage: Record<string, FluxoRow[]> = {}
     const byComp: Record<string, FluxoRow[]> = {}
     for (const r of data) {
       if (!r.mes_ano) continue
@@ -273,50 +618,104 @@ function FunilCompleto({ data, activeEtapa, onEtapaClick }: {
         Object.entries(rawConfig).map(([k, v]) => [Number(k), v])
       )
       const { stage } = expectedStageToday(parsed.year, parsed.month, config)
-      if (stage) result[stage] = (result[stage] ?? 0) + compRows.length
+      if (stage) {
+        expectedByStage[stage] = (expectedByStage[stage] ?? 0) + compRows.length
+        rowsByExpectedStage[stage] = [...(rowsByExpectedStage[stage] ?? []), ...compRows]
+      }
     }
-    return result
+    return { expectedByStage, rowsByExpectedStage }
   }, [data, cronogramaRaw])
 
+  const hasCronograma = Object.keys(expectedByStage).length > 0
+  const [drillStage, setDrillStage] = useState<string | null>(null)
+
   return (
-    <div className="flex items-stretch gap-1 overflow-x-auto pb-1 pt-0.5">
+    <>
+      {drillStage && (
+        <DrillModal
+          expectedStage={drillStage}
+          rows={rowsByExpectedStage[drillStage] ?? []}
+          onClose={() => setDrillStage(null)}
+          onRowClick={onRowClick}
+        />
+      )}
+    <div className="flex items-stretch gap-2 overflow-x-auto pb-2 pt-1">
       {funil.map((item, i) => {
         const color = ETAPA_COLORS[item.etapa] ?? '#9CA3AF'
         const isActive = activeEtapa === item.etapa
-        const isCritical = ETAPAS_CRITICAS.has(item.etapa)
-        const hasCronograma = Object.keys(expectedByStage).length > 0
         const expected = hasCronograma ? (expectedByStage[item.etapa] ?? 0) : undefined
         const diff = expected !== undefined ? item.quantidade - expected : null
+
         return (
-          <div key={item.etapa} className="flex items-center gap-1 flex-1 min-w-[110px]">
+          <div key={item.etapa} className="flex items-center gap-2 flex-1 min-w-[148px]">
             <button
               onClick={() => onEtapaClick(isActive ? null : item.etapa)}
-              className="flex-1 rounded-xl p-3 text-left transition-all hover:shadow-md hover:-translate-y-0.5 border-2"
-              style={{ borderColor: isActive ? color : color + '40', backgroundColor: isActive ? color + '18' : color + '08', boxShadow: isActive ? `0 0 0 2px ${color}40` : undefined }}
+              className="flex-1 h-full rounded-2xl p-4 text-left transition-all hover:shadow-md hover:-translate-y-0.5"
+              style={{
+                border: `2px solid ${isActive ? color : color + '30'}`,
+                backgroundColor: isActive ? color + '12' : color + '07',
+              }}
             >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: color + '20', color }}>{item.percentual}%</span>
-                {isCritical && item.quantidade > 0 && <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />}
+              {/* Indicador da etapa + alerta */}
+              <div className="flex items-center mb-3">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
               </div>
-              <div className="text-xl font-bold text-gray-900 leading-none">{fmtNum(item.quantidade)}</div>
+
+              {/* Contador principal */}
+              <div className="text-[28px] font-bold text-gray-900 leading-none tabular-nums">
+                {fmtNum(item.quantidade)}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                {item.quantidade === 1 ? 'medição' : 'medições'} &middot; {item.percentual}%
+              </div>
+
+              {/* Nome da etapa */}
+              <div className="text-sm font-semibold mt-3 leading-snug" style={{ color }}>
+                {item.etapa}
+              </div>
+
+              {/* Valor financeiro */}
+              <div className="text-xs text-gray-400 mt-0.5">{brl(item.valor)}</div>
+
+              {/* Comparação com cronograma */}
               {expected !== undefined && (
-                <div className="flex items-center gap-1 mt-0.5">
-                  <span className="text-[11px] text-gray-400 tabular-nums">esp: {fmtNum(expected)}</span>
-                  {diff !== null && diff !== 0 && (
-                    <span className={`text-[10px] font-bold tabular-nums ${diff > 0 ? 'text-red-400' : 'text-green-500'}`}>
-                      {diff > 0 ? `+${diff}` : diff}
+                <div className="mt-3 pt-2.5 border-t" style={{ borderColor: color + '25' }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-gray-400">Esperado</span>
+                    <span className="text-[11px] font-semibold text-gray-600 tabular-nums">
+                      {fmtNum(expected)}
                     </span>
+                  </div>
+                  {diff !== null && diff !== 0 && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setDrillStage(item.etapa) }}
+                      className={`text-[11px] font-semibold mt-0.5 leading-tight underline decoration-dotted text-left w-full ${(() => {
+                        const isGood = item.etapa === 'Paga integralmente' ? diff > 0 : diff < 0
+                        return isGood ? 'text-emerald-600 hover:text-emerald-800' : 'text-amber-600 hover:text-amber-800'
+                      })()}`}
+                    >
+                      {diff > 0
+                        ? `${diff} a mais que o esperado`
+                        : `${Math.abs(diff)} a menos que o esperado`}
+                    </button>
+                  )}
+                  {diff === 0 && (
+                    <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                      No cronograma
+                    </p>
                   )}
                 </div>
               )}
-              <div className="text-xs font-semibold mt-1 leading-tight" style={{ color }}>{FUNIL_LABELS[item.etapa] ?? item.etapa}</div>
-              <div className="text-xs text-gray-400 mt-0.5">{brl(item.valor)}</div>
             </button>
-            {i < funil.length - 1 && <ArrowRight size={12} className="flex-shrink-0 text-gray-200" />}
+
+            {i < funil.length - 1 && (
+              <ArrowRight size={14} className="flex-shrink-0 text-gray-300" />
+            )}
           </div>
         )
       })}
     </div>
+    </>
   )
 }
 
@@ -633,10 +1032,11 @@ function SortIcon({ col, sort }: { col: SortKey; sort: { key: SortKey | null; di
   return <ChevronDown size={12} className="text-blue-500 ml-0.5" />
 }
 
-function FluxoTable({ data, localSearch, onLocalSearch }: {
+function FluxoTable({ data, localSearch, onLocalSearch, onRowClick }: {
   data: FluxoRow[]
   localSearch: string
   onLocalSearch: (v: string) => void
+  onRowClick?: (row: FluxoRow) => void
 }) {
   const [sort, setSort] = useState<{ key: SortKey | null; dir: SortDir }>({ key: null, dir: null })
   const [page, setPage] = useState(1)
@@ -715,7 +1115,11 @@ function FluxoTable({ data, localSearch, onLocalSearch }: {
             {pageData.length === 0 ? (
               <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-gray-400">Nenhuma medição encontrada</td></tr>
             ) : pageData.map(row => (
-              <tr key={row.id} className={`transition-colors ${rowHighlight(row)}`}>
+              <tr
+                key={row.id}
+                className={`transition-colors ${rowHighlight(row)} ${onRowClick ? 'cursor-pointer hover:ring-1 hover:ring-inset hover:ring-blue-200' : ''}`}
+                onClick={() => onRowClick?.(row)}
+              >
                 <td className="px-3 py-2.5 max-w-[180px]">
                   <span className="block truncate text-sm font-medium text-gray-800" title={row.empresa}>{row.empresa || '—'}</span>
                   {row.tipo_contrato && <span className="text-xs text-gray-400">{row.tipo_contrato}</span>}
@@ -1124,10 +1528,11 @@ export function FluxoMedicoes({ data: rawData }: Props) {
   const [competenciaDe,  setCompetenciaDe]  = useState(defaultCompetenciaDe)
   const [competenciaAte, setCompetenciaAte] = useState(defaultCompetenciaAte)
   const [etapaFiltro,    setEtapaFiltro]    = useState<string | null>(null)
-  const [diretoriaFiltro,setDiretoriaFiltro]= useState<string[]>([])
+  const [distritoFiltro, setDistritoFiltro] = useState<string[]>([])
   const [localSearch,    setLocalSearch]    = useState('')
   const [showHelp,       setShowHelp]       = useState(false)
   const [activePage, setActivePage] = useState<'resumo' | 'analitico' | 'rastreio' | 'cronograma'>('resumo')
+  const [selectedRow,    setSelectedRow]    = useState<FluxoRow | null>(null)
 
   const tableRef = useRef<HTMLDivElement>(null)
 
@@ -1140,7 +1545,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     empresas:   [...new Set(rows.map(r => r.empresa).filter(Boolean))].sort(),
     rodovias:   [...new Set(rows.flatMap(r => (r.rodovias || '').split(',').map(s => s.trim())).filter(Boolean))].sort(),
     naturezas:  [...new Set(rows.map(r => r.natureza).filter(Boolean))].sort(),
-    diretorias: [...new Set(rows.map(r => r.diretoria).filter(Boolean))].sort(),
+    distritos: [...new Set(rows.map(r => r.distrito).filter(Boolean))].sort(),
     municipios: [...new Set(rows.flatMap(r => (r.municipios || '').split(',').map(s => s.trim())).filter(Boolean))].sort(),
     contratos:  [...new Set(rows.map(r => r.contrato).filter(Boolean))].sort(),
   }), [rows])
@@ -1159,7 +1564,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
         const rowMunicipios = (r.municipios || '').split(',').map(v => v.trim())
         if (!municipio.some(v => v === '(sem info)' ? !rowMunicipios.filter(Boolean).length : rowMunicipios.includes(v))) return false
       }
-      if (diretoriaFiltro.length > 0 && !diretoriaFiltro.includes(r.diretoria)) return false
+      if (distritoFiltro.length > 0 && !distritoFiltro.includes(r.distrito)) return false
       if (competenciaDe) {
         // mes_ano format: "MM/YYYY", filter: "YYYY-MM"
         const [mm, yyyy] = (r.mes_ano || '').split('/')
@@ -1173,7 +1578,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
       }
       return true
     })
-  }, [rows, empresa, contrato, rodovia, natureza, municipio, diretoriaFiltro, competenciaDe, competenciaAte])
+  }, [rows, empresa, contrato, rodovia, natureza, municipio, distritoFiltro, competenciaDe, competenciaAte])
 
   // Com etapa (para tabela)
   const filtered = useMemo(() => {
@@ -1190,7 +1595,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     rodovia.length > 0,
     natureza.length > 0,
     municipio.length > 0,
-    diretoriaFiltro.length > 0,
+    distritoFiltro.length > 0,
     competenciaDe !== defaultCompetenciaDe,
     competenciaAte !== defaultCompetenciaAte,
   ].filter(Boolean).length
@@ -1199,7 +1604,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     setEmpresa([]); setContrato([]); setRodovia([]); setNatureza([]); setMunicipio([])
     setCompetenciaDe(defaultCompetenciaDe)
     setCompetenciaAte(defaultCompetenciaAte)
-    setEtapaFiltro(null); setDiretoriaFiltro([]); setLocalSearch('')
+    setEtapaFiltro(null); setDistritoFiltro([]); setLocalSearch('')
   }
 
   // Dimensões (NaoPagas — etapas fechadas mas não pagas)
@@ -1257,7 +1662,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
   const dimEmpresa    = useMemo(() => dimItems(r => r.empresa),   [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
   const dimRodovia    = useMemo(() => dimItemsMultiValue(r => (r.rodovias || '').split(',').map(v => v.trim())), [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
   const dimMunicipio  = useMemo(() => dimItemsMultiValue(r => (r.municipios || '').split(',').map(v => v.trim())).filter(d => d.label !== '(sem info)'), [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
-  const dimSetor      = useMemo(() => dimItems(r => r.diretoria), [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const dimSetor      = useMemo(() => dimItems(r => r.distrito), [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
   const dimCompetencia = useMemo(() => {
     const acc: Record<string, { valor: number; quantidade: number }> = {}
     for (const r of naoPagasRows) {
@@ -1322,6 +1727,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
   }
 
   return (
+    <>
     <div className="space-y-5">
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
 
@@ -1354,7 +1760,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActivePage(tab.id as 'resumo' | 'analitico' | 'rastreio' | 'cronograma')}
+            onClick={() => { setActivePage(tab.id as 'resumo' | 'analitico' | 'rastreio' | 'cronograma'); setEtapaFiltro(null) }}
             className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all ${
               activePage === tab.id
                 ? 'bg-white text-blue-700 shadow-sm ring-1 ring-blue-100'
@@ -1386,7 +1792,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
               </div>
               {etapaFiltro && <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">{lookupEtapaLabel(etapaFiltro)}</span>}
             </div>
-            <FunilCompleto data={filteredBase} activeEtapa={etapaFiltro} onEtapaClick={handleEtapa} />
+            <FunilCompleto data={filteredBase} activeEtapa={etapaFiltro} onEtapaClick={handleEtapa} onRowClick={setSelectedRow} />
           </div>
 
           <div>
@@ -1411,7 +1817,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
             <DimChart title="Por Empresa"    items={dimEmpresa}   color="#F97316" icon={<Building2 size={14} />} onBarClick={v => handleDimClick(setEmpresa, empresa, v)} activeValue={empresa} />
             <DimChart title="Por Rodovia"    items={dimRodovia}   color="#10B981" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setRodovia, rodovia, v)} activeValue={rodovia} />
             <DimChart title="Por Município"  items={dimMunicipio} color="#6366F1" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setMunicipio, municipio, v)} activeValue={municipio} />
-            <DimChart title="Por Setor"      items={dimSetor}     color="#8B5CF6" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setDiretoriaFiltro, diretoriaFiltro, v)} activeValue={diretoriaFiltro} />
+            <DimChart title="Por Distrito"   items={dimSetor}     color="#8B5CF6" icon={<BarChart3 size={14} />} onBarClick={v => handleDimClick(setDistritoFiltro, distritoFiltro, v)} activeValue={distritoFiltro} />
           </div>
         </div>
       )}
@@ -1435,14 +1841,19 @@ export function FluxoMedicoes({ data: rawData }: Props) {
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
               {etapaFiltro && <button onClick={() => setEtapaFiltro(null)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50"><X size={11} />{lookupEtapaLabel(etapaFiltro)}</button>}
-              {diretoriaFiltro.length > 0 && <button onClick={() => setDiretoriaFiltro([])} className="flex items-center gap-1 text-xs text-emerald-600 border border-emerald-200 rounded-lg px-2.5 py-1.5 hover:bg-emerald-50"><X size={11} />{diretoriaFiltro.length === 1 ? diretoriaFiltro[0] : `${diretoriaFiltro.length} setores`}</button>}
+              {distritoFiltro.length > 0 && <button onClick={() => setDistritoFiltro([])} className="flex items-center gap-1 text-xs text-emerald-600 border border-emerald-200 rounded-lg px-2.5 py-1.5 hover:bg-emerald-50"><X size={11} />{distritoFiltro.length === 1 ? distritoFiltro[0] : `${distritoFiltro.length} distritos`}</button>}
               {municipio.length > 0 && <button onClick={() => setMunicipio([])} className="flex items-center gap-1 text-xs text-indigo-600 border border-indigo-200 rounded-lg px-2.5 py-1.5 hover:bg-indigo-50"><X size={11} />{municipio.length === 1 ? municipio[0] : `${municipio.length} municípios`}</button>}
             </div>
           </div>
-          <FluxoTable data={filtered} localSearch={localSearch} onLocalSearch={setLocalSearch} />
+          <FluxoTable data={filtered} localSearch={localSearch} onLocalSearch={setLocalSearch} onRowClick={setSelectedRow} />
         </div>
       )}
     </div>
+
+      {selectedRow && (
+        <MedicaoModal row={selectedRow} onClose={() => setSelectedRow(null)} />
+      )}
+    </>
   )
 }
 

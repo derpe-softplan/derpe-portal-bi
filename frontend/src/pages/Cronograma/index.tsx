@@ -450,8 +450,11 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                       const isToday = day === todayDayNum
 
                       const { dow, holiday } = dayMeta[d]
+                      const isWknd = valid && (dow === 0 || dow === 6)
 
-                      const emptyBg = '#F3F4F6'
+                      const emptyBg = holiday ? '#FEFCE8' : isWknd ? '#F1F5F9' : '#F3F4F6'
+                      const letter  = holiday ? 'F' : dow === 0 ? 'D' : dow === 6 ? 'S' : null
+                      const letterColor = holiday ? '#D97706' : '#94A3B8'
                       const hoverCls = color ? 'hover:opacity-75' : 'hover:bg-gray-200'
 
                       const pad2 = (n: number) => String(n).padStart(2, '0')
@@ -474,6 +477,11 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                               onMouseEnter={() => onCellEnter(compMonth, day)}
                               title={title}
                             >
+                              {!color && letter && (
+                                <span className="text-[9px] font-bold leading-none select-none" style={{ color: letterColor }}>
+                                  {letter}
+                                </span>
+                              )}
                             </div>
                           ) : (
                             <div className="w-[22px] h-[22px]" />
@@ -512,6 +520,20 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
             <span className="ml-2 text-green-500 font-semibold">●</span> Configurado &nbsp;
             <span className="text-gray-300 font-semibold">●</span> Sem configuração
           </p>
+          <div className="flex items-center gap-4 pt-0.5">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold" style={{ backgroundColor: '#F1F5F9', color: '#94A3B8' }}>D</span>
+              Domingo
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold" style={{ backgroundColor: '#F1F5F9', color: '#94A3B8' }}>S</span>
+              Sábado
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold" style={{ backgroundColor: '#FEFCE8', color: '#D97706' }}>F</span>
+              Feriado
+            </span>
+          </div>
         </div>
       </div>
     </div>

@@ -54,6 +54,12 @@ export const cronogramaApi = {
   delete: (key: string) => api.delete(`/admin/cronograma/${key}`),
 };
 
+// ── Medição ───────────────────────────────────────────────────────────────────
+export const medicaoApi = {
+  getAssinaturas: (skmedicao: string) =>
+    api.get<MedicaoAssinatura[]>(`/portal/medicoes/${skmedicao}/assinaturas`),
+}
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 export const adminApi = {
   users: {
@@ -164,6 +170,16 @@ export interface ReportCreate {
   slug: string;
   sql_query: string;
   chart_config?: string;
+}
+
+export interface MedicaoAssinatura {
+  nutitulo: number | null
+  cdtitulo: string | null
+  skmedicao: number | null
+  nuseqmedicaoh: number | null
+  nmpapel: string | null
+  nmsituacao: string | null
+  nmfiscal: string | null
 }
 
 export interface Permission {
