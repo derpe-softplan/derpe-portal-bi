@@ -1,7 +1,6 @@
+import base64
 import json
-import uuid
 from datetime import datetime
-from pathlib import Path
 
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
@@ -27,11 +26,12 @@ from app.db.session import get_db
 from app.reports.refresh import run_refresh, scheduler
 
 router = APIRouter()
-UPLOADS_DIR = Path(__file__).resolve().parents[2] / "uploads" / "reports"
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+MAX_COVER_SIZE = 2 * 1024 * 1024  # 2 MB
 
 
-def _save_cover_image(file: UploadFile) -> str:
+def _encode_cover_image(file: UploadFile) -> str:
+    """Lê a imagem e retorna uma data URI base64 para armazenar no banco."""
     if not file.filename:
         raise HTTPException(400, "Arquivo de imagem inválido")
 
@@ -39,15 +39,12 @@ def _save_cover_image(file: UploadFile) -> str:
     if not content_type.startswith("image/"):
         raise HTTPException(400, "A capa do relatório deve ser uma imagem.")
 
-    extension = Path(file.filename).suffix.lower() or ".png"
-    filename = f"{uuid.uuid4().hex}{extension}"
-    save_path = UPLOADS_DIR / filename
+    data = file.file.read(MAX_COVER_SIZE + 1)
+    if len(data) > MAX_COVER_SIZE:
+        raise HTTPException(413, "Imagem muito grande. Máximo: 2 MB.")
 
-    with save_path.open("wb") as destination:
-        while chunk := file.file.read(1024 * 1024):
-            destination.write(chunk)
-
-    return f"/uploads/reports/{filename}"
+    b64 = base64.b64encode(data).decode()
+    return f"data:{content_type};base64,{b64}"
 
 
 # ── Users ─────────────────────────────────────────────────────────────────────
@@ -317,7 +314,7 @@ async def upload_report_cover(
     if not report:
         raise HTTPException(404, "Relatório não encontrado")
 
-    cover_url = _save_cover_image(file)
+    cover_url = _encode_cover_image(file)
     report.cover_image_url = cover_url
     await db.commit()
     await db.refresh(report)

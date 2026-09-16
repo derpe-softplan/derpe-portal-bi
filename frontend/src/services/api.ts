@@ -25,6 +25,8 @@ export function parseUTC(s?: string | null): Date | null {
 
 export function resolveImageUrl(url?: string | null, cacheBust = false): string | undefined {
   if (!url) return undefined
+  // data URIs (base64) são usadas diretamente — não precisam de host nem cache-bust
+  if (url.startsWith('data:')) return url
   if (/^https?:\/\//i.test(url))
     return cacheBust ? `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}` : url
 

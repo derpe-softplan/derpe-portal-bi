@@ -77,7 +77,7 @@ class Report(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String(200), nullable=False)
     description = Column(Text)
-    cover_image_url = Column(String(500), nullable=True)
+    cover_image_url = Column(Text, nullable=True)
     slug = Column(String(100), unique=True, nullable=False, index=True)
     sql_query = Column(Text, nullable=False)
     chart_config = Column(Text)
