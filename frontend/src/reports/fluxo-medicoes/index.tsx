@@ -2367,15 +2367,15 @@ export function FluxoMedicoes({ data: rawData }: Props) {
   const dimEmpresa = useMemo(() => dimItems((r) => r.empresa), [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
   const dimRodovia = useMemo(
     () => dimItemsMultiValue((r) => (r.rodovias || '').split(',').map((v) => v.trim())),
-    [naoPagasRows]
-  ) // eslint-disable-line react-hooks/exhaustive-deps
+    [naoPagasRows] // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const dimMunicipio = useMemo(
     () =>
       dimItemsMultiValue((r) => (r.municipios || '').split(',').map((v) => v.trim())).filter(
         (d) => d.label !== '(sem info)'
       ),
-    [naoPagasRows]
-  ) // eslint-disable-line react-hooks/exhaustive-deps
+    [naoPagasRows] // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const dimSetor = useMemo(() => dimItems((r) => r.distrito), [naoPagasRows]) // eslint-disable-line react-hooks/exhaustive-deps
   const dimCompetencia = useMemo(() => {
     const acc: Record<string, { valor: number; quantidade: number }> = {}
