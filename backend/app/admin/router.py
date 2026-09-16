@@ -1,9 +1,9 @@
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-import uuid
 
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select, text
@@ -13,11 +13,17 @@ from sqlalchemy.orm import selectinload
 from app.auth.deps import require_admin, require_publisher
 from app.auth.service import hash_password
 from app.db.models import (
-    Group, RefreshLog, Report, ReportPermission, ReportSnapshot, ReportStatus,
-    User, UserGroup, UserRole,
+    Group,
+    RefreshLog,
+    Report,
+    ReportPermission,
+    ReportSnapshot,
+    ReportStatus,
+    User,
+    UserGroup,
+    UserRole,
 )
 from app.db.session import get_db
-from apscheduler.triggers.cron import CronTrigger
 from app.reports.refresh import run_refresh, scheduler
 
 router = APIRouter()
@@ -54,10 +60,10 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = None
-    role: Optional[UserRole] = None
-    is_active: Optional[bool] = None
-    password: Optional[str] = None
+    full_name: str | None = None
+    role: UserRole | None = None
+    is_active: bool | None = None
+    password: str | None = None
 
 
 class UserOut(BaseModel):
@@ -116,13 +122,13 @@ async def update_user(user_id: int, body: UserUpdate, db: AsyncSession = Depends
 
 class GroupCreate(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class GroupOut(BaseModel):
     id: int
     name: str
-    description: Optional[str]
+    description: str | None
     model_config = {"from_attributes": True}
 
 
@@ -162,20 +168,20 @@ async def remove_member(group_id: int, user_id: int, db: AsyncSession = Depends(
 
 class ReportCreate(BaseModel):
     title: str
-    description: Optional[str] = None
-    cover_image_url: Optional[str] = None
+    description: str | None = None
+    cover_image_url: str | None = None
     slug: str
     sql_query: str
-    chart_config: Optional[str] = None
+    chart_config: str | None = None
 
 
 class ReportUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    cover_image_url: Optional[str] = None
-    slug: Optional[str] = None
-    sql_query: Optional[str] = None
-    chart_config: Optional[str] = None
+    title: str | None = None
+    description: str | None = None
+    cover_image_url: str | None = None
+    slug: str | None = None
+    sql_query: str | None = None
+    chart_config: str | None = None
 
 
 class StatusChange(BaseModel):
@@ -185,29 +191,29 @@ class StatusChange(BaseModel):
 class ReportOut(BaseModel):
     id: int
     title: str
-    description: Optional[str]
-    cover_image_url: Optional[str] = None
+    description: str | None
+    cover_image_url: str | None = None
     slug: str
     status: str
-    refresh_schedule: Optional[str] = None
-    next_refresh_at: Optional[str] = None
+    refresh_schedule: str | None = None
+    next_refresh_at: str | None = None
     created_at: datetime
     updated_at: datetime
-    published_at: Optional[datetime]
-    last_refreshed_at: Optional[datetime] = None
-    row_count: Optional[int] = None
+    published_at: datetime | None
+    last_refreshed_at: datetime | None = None
+    row_count: int | None = None
     model_config = {"from_attributes": True}
 
 
 class PermissionCreate(BaseModel):
-    user_id: Optional[int] = None
-    group_id: Optional[int] = None
+    user_id: int | None = None
+    group_id: int | None = None
 
 
 class PermissionOut(BaseModel):
     id: int
-    user_id: Optional[int]
-    group_id: Optional[int]
+    user_id: int | None
+    group_id: int | None
     model_config = {"from_attributes": True}
 
 
@@ -334,7 +340,7 @@ async def refresh_snapshot(
 
 
 class ScheduleUpdate(BaseModel):
-    cron: Optional[str] = None
+    cron: str | None = None
 
 
 @router.patch("/reports/{report_id}/schedule")

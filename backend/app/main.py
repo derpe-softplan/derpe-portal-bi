@@ -1,23 +1,24 @@
 import logging
 from contextlib import asynccontextmanager
-
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from redis.asyncio import Redis
-from sqlalchemy import select, text
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+import app.superset.client as superset_module
+from app.auth.service import hash_password, verify_password
 from app.config import settings
-from app.db.base import Base
 from app.db.models import Report, ReportStatus, User, UserRole
 from app.db.session import AsyncSessionLocal, engine
-from app.auth.service import hash_password, verify_password
+from app.limiter import limiter
 from app.reports import CATALOG
-from app.reports.refresh import run_refresh, scheduler, setup_scheduler
-import app.superset.client as superset_module
+from app.reports.refresh import scheduler, setup_scheduler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,22 +33,7 @@ redis_client: Redis = None  # type: ignore
 async def lifespan(app: FastAPI):
     global redis_client
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.execute(text(
-            "ALTER TABLE reports ADD COLUMN IF NOT EXISTS refresh_schedule VARCHAR(100)"
-        ))
-        await conn.execute(text(
-            "ALTER TABLE reports ADD COLUMN IF NOT EXISTS panel_slug VARCHAR(100)"
-        ))
-        await conn.execute(text(
-            "CREATE TABLE IF NOT EXISTS cronograma_config ("
-            "  key VARCHAR(20) PRIMARY KEY,"
-            "  value TEXT NOT NULL,"
-            "  updated_at TIMESTAMP NOT NULL DEFAULT NOW()"
-            ")"
-        ))
-    logger.info("Tabelas criadas/verificadas")
+    logger.info("Schema gerenciado pelo Alembic — migrations aplicadas no startup do container")
 
     async with AsyncSessionLocal() as session:
         try:
@@ -137,6 +123,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="DER-PE Portal BI", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR.parent)), name="uploads")
 
@@ -148,9 +136,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.auth.router import router as auth_router
-from app.admin.router import router as admin_router
-from app.portal.router import router as portal_router
+from app.admin.router import router as admin_router  # noqa: E402
+from app.auth.router import router as auth_router  # noqa: E402
+from app.portal.router import router as portal_router  # noqa: E402
 
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(admin_router, prefix="/api/admin", tags=["admin"])

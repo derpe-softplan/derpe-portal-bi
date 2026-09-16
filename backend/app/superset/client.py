@@ -137,7 +137,7 @@ class SupersetClient:
             return []
         if isinstance(rows[0], dict):
             return rows
-        return [dict(zip(columns, row)) for row in rows]
+        return [dict(zip(columns, row, strict=False)) for row in rows]
 
     async def query(self, sql: str) -> list[dict[str, Any]]:
         try:

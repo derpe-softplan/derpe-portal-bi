@@ -12,6 +12,9 @@ node_modules/
 frontend/dist/
 *.tsbuildinfo
 
+# Uploads (arquivos gerados em runtime)
+backend/uploads/
+
 # Docker
 *.log
 

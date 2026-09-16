@@ -1,26 +1,26 @@
-import { ReactNode } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
-import { BarChart3, LayoutDashboard, LogOut, Settings } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
-import clsx from "clsx";
+import { ReactNode } from 'react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { BarChart3, LayoutDashboard, LogOut, Settings } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import clsx from 'clsx'
 
 export default function PortalLayout({
   children,
   wide = false,
 }: {
-  children: ReactNode;
-  wide?: boolean;
+  children: ReactNode
+  wide?: boolean
 }) {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
 
   const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
+    await logout()
+    navigate('/login')
+  }
 
-  const isPublisher = user?.role === "admin" || user?.role === "publisher";
-  const isViewer = user?.role === "viewer";
+  const isPublisher = user?.role === 'admin' || user?.role === 'publisher'
+  const isViewer = user?.role === 'viewer'
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -49,8 +49,8 @@ export default function PortalLayout({
                 end
                 className={({ isActive }) =>
                   clsx(
-                    "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                    isActive ? "bg-white/20" : "hover:bg-white/10"
+                    'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                    isActive ? 'bg-white/20' : 'hover:bg-white/10'
                   )
                 }
               >
@@ -64,8 +64,8 @@ export default function PortalLayout({
                     to="/admin"
                     className={({ isActive }) =>
                       clsx(
-                        "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                        isActive ? "bg-white/20" : "hover:bg-white/10"
+                        'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                        isActive ? 'bg-white/20' : 'hover:bg-white/10'
                       )
                     }
                   >
@@ -96,8 +96,8 @@ export default function PortalLayout({
       {/* ── Content ──────────────────────────────────────────────────────── */}
       <main
         className={clsx(
-          "flex-1 px-4 lg:px-8 py-6 w-full mx-auto",
-          wide ? "max-w-[1600px]" : "max-w-screen-2xl"
+          'flex-1 px-4 lg:px-8 py-6 w-full mx-auto',
+          wide ? 'max-w-[1600px]' : 'max-w-screen-2xl'
         )}
       >
         {children}
@@ -107,5 +107,5 @@ export default function PortalLayout({
         DER-PE · Portal BI © {new Date().getFullYear()} · Governo de Pernambuco
       </footer>
     </div>
-  );
+  )
 }

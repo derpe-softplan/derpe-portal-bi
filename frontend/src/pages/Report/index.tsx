@@ -1,44 +1,43 @@
-import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Clock, Database } from "lucide-react";
-import { portalApi, parseUTC } from "../../services/api";
-import { resolvePanelBySlug } from "../../panels/registry";
+import { useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { Clock, Database } from 'lucide-react'
+import { portalApi, parseUTC } from '../../services/api'
+import { resolvePanelBySlug } from '../../panels/registry'
 
 function CellValue({ value }: { value: unknown }) {
-  return <span>{value === null || value === undefined ? "" : String(value)}</span>;
+  return <span>{value === null || value === undefined ? '' : String(value)}</span>
 }
 
 export default function ReportPage() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug } = useParams<{ slug: string }>()
 
   const { data: meta } = useQuery({
-    queryKey: ["report-meta", slug],
+    queryKey: ['report-meta', slug],
     queryFn: () => portalApi.getReport(slug!).then((r) => r.data),
     enabled: !!slug,
-  });
+  })
 
   // panel_slug é o nome da pasta (imutável); slug é o de URL (editável pelo admin)
-  const Panel = resolvePanelBySlug(meta?.panel_slug ?? slug);
+  const Panel = resolvePanelBySlug(meta?.panel_slug ?? slug)
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["report-data", slug],
+    queryKey: ['report-data', slug],
     queryFn: () => portalApi.getReportData(slug!).then((r) => r.data),
     enabled: !!slug,
     staleTime: Infinity,
-  });
+  })
 
   return (
     <div className="px-4 lg:px-8 py-5">
       {/* Header */}
       <div className="mb-5">
         <h1 className="text-xl font-bold text-gray-900 leading-tight">
-          {meta?.title ?? "Carregando..."}
+          {meta?.title ?? 'Carregando...'}
         </h1>
         {meta?.last_refreshed_at && (
           <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
             <Clock size={11} />
-            Atualizado em{" "}
-            {parseUTC(meta.last_refreshed_at)?.toLocaleString("pt-BR")}
+            Atualizado em {parseUTC(meta.last_refreshed_at)?.toLocaleString('pt-BR')}
           </p>
         )}
       </div>
@@ -63,8 +62,11 @@ export default function ReportPage() {
       )}
 
       {/* Panel */}
-      {!isLoading && !error && data && data.length > 0 && (
-        Panel ? (
+      {!isLoading &&
+        !error &&
+        data &&
+        data.length > 0 &&
+        (Panel ? (
           <Panel data={data} />
         ) : (
           <div className="card overflow-hidden">
@@ -96,12 +98,11 @@ export default function ReportPage() {
               </table>
             </div>
           </div>
-        )
-      )}
+        ))}
 
       {!isLoading && !error && data?.length === 0 && (
         <div className="card p-10 text-center text-gray-400">Sem dados para exibir.</div>
       )}
     </div>
-  );
+  )
 }

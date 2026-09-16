@@ -49,7 +49,7 @@ export function MonthPicker({ value, onChange, placeholder = 'Selecionar' }: Pro
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen((v) => !v)}
         className={`flex items-center gap-1.5 h-9 px-3 rounded-lg border text-sm transition-all whitespace-nowrap select-none ${
           hasValue
             ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold'
@@ -59,7 +59,11 @@ export function MonthPicker({ value, onChange, placeholder = 'Selecionar' }: Pro
         <Calendar size={13} className={hasValue ? 'text-blue-500' : 'text-gray-400'} />
         <span>{display}</span>
         {hasValue ? (
-          <X size={12} onClick={clear} className="ml-0.5 text-blue-400 hover:text-blue-700 transition-colors" />
+          <X
+            size={12}
+            onClick={clear}
+            className="ml-0.5 text-blue-400 hover:text-blue-700 transition-colors"
+          />
         ) : (
           <ChevronDown size={12} className="text-gray-300 ml-0.5" />
         )}
@@ -68,11 +72,19 @@ export function MonthPicker({ value, onChange, placeholder = 'Selecionar' }: Pro
       {open && (
         <div className="absolute z-50 top-full mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-52">
           <div className="flex items-center justify-between mb-2.5 px-1">
-            <button type="button" onClick={() => setViewYear(y => y - 1)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+            <button
+              type="button"
+              onClick={() => setViewYear((y) => y - 1)}
+              className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+            >
               <ChevronLeft size={15} />
             </button>
             <span className="text-sm font-bold text-gray-800">{viewYear}</span>
-            <button type="button" onClick={() => setViewYear(y => y + 1)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+            <button
+              type="button"
+              onClick={() => setViewYear((y) => y + 1)}
+              className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+            >
               <ChevronRight size={15} />
             </button>
           </div>

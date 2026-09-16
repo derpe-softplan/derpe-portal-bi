@@ -7,7 +7,9 @@ type PanelModule = { Panel: PanelComponent }
 type ThumbnailModule = { Thumbnail: ThumbnailComponent }
 
 const panelModules = import.meta.glob<PanelModule>('../reports/*/index.tsx', { eager: true })
-const thumbnailModules = import.meta.glob<ThumbnailModule>('../reports/*/Thumbnail.tsx', { eager: true })
+const thumbnailModules = import.meta.glob<ThumbnailModule>('../reports/*/Thumbnail.tsx', {
+  eager: true,
+})
 
 function slugFromPath(path: string): string {
   return path.replace(/^.*\/reports\//, '').replace(/\/.*$/, '')

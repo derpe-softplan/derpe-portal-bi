@@ -1,9 +1,7 @@
 import json
-from typing import Any, Optional
-from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -67,7 +65,7 @@ async def get_medicao_assinaturas(
     try:
         mid = int(skmedicao)
     except ValueError:
-        raise HTTPException(400, "ID de medição inválido")
+        raise HTTPException(400, "ID de medição inválido") from None
 
     sql = f"""SELECT DISTINCT
     c.nutitulo,

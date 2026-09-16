@@ -1,26 +1,26 @@
-import { FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { FormEvent, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 
 export default function Login() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { login } = useAuth()
+  const navigate = useNavigate()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+    e.preventDefault()
+    setError('')
+    setLoading(true)
     try {
-      await login(email, password);
-      navigate("/");
+      await login(email, password)
+      navigate('/')
     } catch {
-      setError("E-mail ou senha inválidos.");
+      setError('E-mail ou senha inválidos.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
@@ -45,10 +45,29 @@ export default function Login() {
         </svg>
 
         {/* Decorative road lines */}
-        <svg className="absolute inset-0 w-full h-full opacity-10" xmlns="http://www.w3.org/2000/svg">
-          <line x1="0" y1="70%" x2="100%" y2="55%" stroke="white" strokeWidth="3" strokeDasharray="20 12" />
+        <svg
+          className="absolute inset-0 w-full h-full opacity-10"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <line
+            x1="0"
+            y1="70%"
+            x2="100%"
+            y2="55%"
+            stroke="white"
+            strokeWidth="3"
+            strokeDasharray="20 12"
+          />
           <line x1="0" y1="73%" x2="100%" y2="58%" stroke="white" strokeWidth="1" />
-          <line x1="0" y1="40%" x2="60%" y2="80%" stroke="white" strokeWidth="2" strokeDasharray="20 12" />
+          <line
+            x1="0"
+            y1="40%"
+            x2="60%"
+            y2="80%"
+            stroke="white"
+            strokeWidth="2"
+            strokeDasharray="20 12"
+          />
         </svg>
 
         {/* Yellow accent bar */}
@@ -67,18 +86,17 @@ export default function Login() {
 
             <div className="mb-6">
               <div className="w-12 h-1 bg-gov-yellow mb-6 rounded" />
-              <h1 className="text-5xl font-light leading-tight mb-3">
-                Portal BI
-              </h1>
+              <h1 className="text-5xl font-light leading-tight mb-3">Portal BI</h1>
               <p className="text-xl font-light text-blue-200">
                 Departamento de Estradas
-                <br />de Rodagem de Pernambuco
+                <br />
+                de Rodagem de Pernambuco
               </p>
             </div>
 
             <p className="text-sm text-blue-300 leading-relaxed max-w-sm">
-              Plataforma centralizada de indicadores e relatórios analíticos
-              para acompanhamento de obras, contratos e medições.
+              Plataforma centralizada de indicadores e relatórios analíticos para acompanhamento de
+              obras, contratos e medições.
             </p>
           </div>
 
@@ -124,9 +142,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Senha
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Senha</label>
               <input
                 type="password"
                 className="input"
@@ -149,7 +165,7 @@ export default function Login() {
               disabled={loading}
               className="btn-primary w-full py-3 mt-2 text-base"
             >
-              {loading ? "Entrando..." : "Entrar"}
+              {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
 
@@ -164,5 +180,5 @@ export default function Login() {
         </div>
       </div>
     </div>
-  );
+  )
 }

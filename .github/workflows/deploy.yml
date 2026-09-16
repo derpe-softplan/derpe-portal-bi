@@ -9,10 +9,42 @@ env:
   IMAGE_FRONTEND: ghcr.io/derpe-softplan/portal-frontend
 
 jobs:
-  # ── 1. Build & push imagens para o GHCR ──────────────────────────────────────
+  # ── 1. Lint ───────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Ruff — backend
+        run: |
+          pip install ruff==0.6.9
+          ruff check backend/app
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: ESLint — frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run lint
+
+  # ── 2. Build & push imagens para o GHCR ──────────────────────────────────────
   build:
     name: Build & Push
     runs-on: ubuntu-latest
+    needs: lint
     permissions:
       contents: read
       packages: write
@@ -52,7 +84,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── 2. Deploy no OCI ─────────────────────────────────────────────────────────
+  # ── 3. Deploy no OCI ─────────────────────────────────────────────────────────
   deploy:
     name: Deploy → OCI
     runs-on: ubuntu-latest
@@ -88,3 +120,18 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d
             docker image prune -f
             echo "Deploy concluído: $(date)"
+
+      - name: Health check pós-deploy
+        run: |
+          echo "Aguardando serviços iniciarem..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://${{ secrets.OCI_HOST }}/api/health || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✓ Health check OK (tentativa $i)"
+              exit 0
+            fi
+            echo "Tentativa $i: status $STATUS — aguardando 5s..."
+            sleep 5
+          done
+          echo "✗ Health check falhou após 60s"
+          exit 1

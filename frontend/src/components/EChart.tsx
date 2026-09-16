@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function EChart({ option, height = 300, className = '', onEvents }: Props) {
-  const ref   = useRef<HTMLDivElement>(null)
+  const ref = useRef<HTMLDivElement>(null)
   const chart = useRef<echarts.ECharts | null>(null)
 
   useEffect(() => {
@@ -17,7 +17,10 @@ export function EChart({ option, height = 300, className = '', onEvents }: Props
     chart.current = echarts.init(ref.current, undefined, { renderer: 'svg' })
     const ro = new ResizeObserver(() => chart.current?.resize())
     ro.observe(ref.current)
-    return () => { ro.disconnect(); chart.current?.dispose() }
+    return () => {
+      ro.disconnect()
+      chart.current?.dispose()
+    }
   }, [])
 
   useEffect(() => {
@@ -29,7 +32,9 @@ export function EChart({ option, height = 300, className = '', onEvents }: Props
     if (!c || !onEvents) return
     Object.entries(onEvents).forEach(([ev, handler]) => c.on(ev, handler as (p: unknown) => void))
     return () => {
-      Object.entries(onEvents).forEach(([ev, handler]) => c.off(ev, handler as (p: unknown) => void))
+      Object.entries(onEvents).forEach(([ev, handler]) =>
+        c.off(ev, handler as (p: unknown) => void)
+      )
     }
   }, [onEvents])
 

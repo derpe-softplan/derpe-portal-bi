@@ -6,29 +6,29 @@ import { cronogramaApi } from '../../services/api'
 // ── Etapas ────────────────────────────────────────────────────────────────────
 
 const ETAPAS = [
-  { key: 'Criada',                        color: '#9CA3AF' },
-  { key: 'Iniciada',                       color: '#0EA5E9' },
-  { key: 'Assinatura pendente',            color: '#F59E0B' },
-  { key: 'Finalizada - aguardando nota',   color: '#F97316' },
-  { key: 'Nota emitida',                   color: '#8B5CF6' },
-  { key: 'Liquidada',                      color: '#06B6D4' },
-  { key: 'Paga parcialmente',              color: '#84CC16' },
-  { key: 'Paga integralmente',             color: '#16A34A' },
+  { key: 'Criada', color: '#9CA3AF' },
+  { key: 'Iniciada', color: '#0EA5E9' },
+  { key: 'Assinatura pendente', color: '#F59E0B' },
+  { key: 'Finalizada - aguardando nota', color: '#F97316' },
+  { key: 'Nota emitida', color: '#8B5CF6' },
+  { key: 'Liquidada', color: '#06B6D4' },
+  { key: 'Paga parcialmente', color: '#84CC16' },
+  { key: 'Paga integralmente', color: '#16A34A' },
 ]
 
-const ETAPA_COLOR: Record<string, string> = Object.fromEntries(ETAPAS.map(e => [e.key, e.color]))
+const ETAPA_COLOR: Record<string, string> = Object.fromEntries(ETAPAS.map((e) => [e.key, e.color]))
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 const DOW_ABBR = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 
 const STAGE_SHORT: Record<string, string> = {
-  'Criada':                       'Criada',
-  'Iniciada':                     'Iniciada',
-  'Assinatura pendente':          'Assin. Pend.',
+  Criada: 'Criada',
+  Iniciada: 'Iniciada',
+  'Assinatura pendente': 'Assin. Pend.',
   'Finalizada - aguardando nota': 'Ag. Nota',
-  'Nota emitida':                 'Nota Emit.',
-  'Liquidada':                    'Liquidada',
-  'Paga parcialmente':            'Paga Parc.',
-  'Paga integralmente':           'Paga Integr.',
+  'Nota emitida': 'Nota Emit.',
+  Liquidada: 'Liquidada',
+  'Paga parcialmente': 'Paga Parc.',
+  'Paga integralmente': 'Paga Integr.',
 }
 
 // ── Utilitários de calendário ──────────────────────────────────────────────────
@@ -68,16 +68,16 @@ function getHolidayMap(year: number): Map<string, string> {
   const map = new Map<string, string>()
   const add = (month: number, day: number, name: string) => map.set(`${month}-${day}`, name)
 
-  add(1,  1,  'Ano Novo')
-  add(4,  21, 'Tiradentes')
-  add(5,  1,  'Dia do Trabalho')
-  add(9,  7,  'Independência')
+  add(1, 1, 'Ano Novo')
+  add(4, 21, 'Tiradentes')
+  add(5, 1, 'Dia do Trabalho')
+  add(9, 7, 'Independência')
   add(10, 12, 'N. Sra. Aparecida')
-  add(11, 2,  'Finados')
+  add(11, 2, 'Finados')
   add(11, 15, 'Proclamação da República')
   if (year >= 2024) add(11, 20, 'Consciência Negra')
   add(12, 25, 'Natal')
-  add(3,  6,  'Revolução Pernambucana')
+  add(3, 6, 'Revolução Pernambucana')
 
   const easter = computeEaster(year)
   const addOffset = (offset: number, name: string) => {
@@ -87,9 +87,9 @@ function getHolidayMap(year: number): Map<string, string> {
   }
   addOffset(-48, 'Carnaval')
   addOffset(-47, 'Carnaval')
-  addOffset(-2,  'Sexta-feira Santa')
-  addOffset(0,   'Páscoa')
-  addOffset(60,  'Corpus Christi')
+  addOffset(-2, 'Sexta-feira Santa')
+  addOffset(0, 'Páscoa')
+  addOffset(60, 'Corpus Christi')
 
   HOLIDAY_CACHE.set(year, map)
   return map
@@ -100,14 +100,14 @@ function getHolidayMap(year: number): Map<string, string> {
 type ModeloItem = { stage: string; dias: number }
 
 const DEFAULT_MODELO: ModeloItem[] = [
-  { stage: 'Criada',                        dias: 1 },
-  { stage: 'Iniciada',                       dias: 2 },
-  { stage: 'Assinatura pendente',            dias: 2 },
-  { stage: 'Finalizada - aguardando nota',   dias: 2 },
-  { stage: 'Nota emitida',                   dias: 2 },
-  { stage: 'Liquidada',                      dias: 2 },
-  { stage: 'Paga parcialmente',              dias: 1 },
-  { stage: 'Paga integralmente',             dias: 1 },
+  { stage: 'Criada', dias: 1 },
+  { stage: 'Iniciada', dias: 2 },
+  { stage: 'Assinatura pendente', dias: 2 },
+  { stage: 'Finalizada - aguardando nota', dias: 2 },
+  { stage: 'Nota emitida', dias: 2 },
+  { stage: 'Liquidada', dias: 2 },
+  { stage: 'Paga parcialmente', dias: 1 },
+  { stage: 'Paga integralmente', dias: 1 },
 ] // total: 13 dias úteis
 
 function loadModelo(): ModeloItem[] {
@@ -115,25 +115,31 @@ function loadModelo(): ModeloItem[] {
     const s = localStorage.getItem('cronograma-modelo')
     if (!s) return DEFAULT_MODELO
     const parsed: ModeloItem[] = JSON.parse(s)
-    return DEFAULT_MODELO.map(d => ({
+    return DEFAULT_MODELO.map((d) => ({
       ...d,
-      dias: parsed.find(p => p.stage === d.stage)?.dias ?? d.dias,
+      dias: parsed.find((p) => p.stage === d.stage)?.dias ?? d.dias,
     }))
-  } catch { return DEFAULT_MODELO }
+  } catch {
+    return DEFAULT_MODELO
+  }
 }
 
 function saveModelo(modelo: ModeloItem[]): void {
-  try { localStorage.setItem('cronograma-modelo', JSON.stringify(modelo)) } catch {}
+  try {
+    localStorage.setItem('cronograma-modelo', JSON.stringify(modelo))
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 function autoFill(
   schedYear: number,
   schedMonth: number,
-  modelo: ModeloItem[],
+  modelo: ModeloItem[]
 ): Record<number, string> {
   const maxDays = daysInMonth(schedYear, schedMonth)
   const holidays = getHolidayMap(schedYear)
-  const active = modelo.filter(m => m.dias > 0)
+  const active = modelo.filter((m) => m.dias > 0)
   if (active.length === 0) return {}
 
   const result: Record<number, string> = {}
@@ -177,7 +183,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
 
   const { data: cronogramaData, isLoading } = useQuery({
     queryKey: ['cronograma'],
-    queryFn: () => cronogramaApi.getAll().then(r => r.data),
+    queryFn: () => cronogramaApi.getAll().then((r) => r.data),
     staleTime: 5 * 60 * 1000,
   })
 
@@ -186,16 +192,16 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
       initialized.current = true
       const converted: Record<string, Record<number, string>> = {}
       for (const [mk, days] of Object.entries(cronogramaData)) {
-        converted[mk] = Object.fromEntries(
-          Object.entries(days).map(([k, v]) => [Number(k), v])
-        )
+        converted[mk] = Object.fromEntries(Object.entries(days).map(([k, v]) => [Number(k), v]))
       }
       setConfigs(converted)
     }
   }, [cronogramaData])
 
   useEffect(() => {
-    const stop = () => { painting.current = false }
+    const stop = () => {
+      painting.current = false
+    }
     window.addEventListener('mouseup', stop)
     return () => window.removeEventListener('mouseup', stop)
   }, [])
@@ -208,7 +214,9 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
       if (Object.keys(cfg).length === 0) {
         cronogramaApi.delete(mk).catch(() => {})
       } else {
-        cronogramaApi.save(mk, Object.fromEntries(Object.entries(cfg).map(([k, v]) => [k, v]))).catch(() => {})
+        cronogramaApi
+          .save(mk, Object.fromEntries(Object.entries(cfg).map(([k, v]) => [k, v])))
+          .catch(() => {})
       }
       queryClient.invalidateQueries({ queryKey: ['cronograma'] })
     }, 800)
@@ -217,7 +225,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
 
   function updateCell(compMonth: number, day: number, value: string | null) {
     const mk = `${ano}-${String(compMonth).padStart(2, '0')}`
-    setConfigs(prev => {
+    setConfigs((prev) => {
       const cfg = { ...(prev[mk] ?? {}) }
       if (value === null) delete cfg[day]
       else cfg[day] = value
@@ -243,19 +251,24 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
 
   function clearRow(compMonth: number) {
     const mk = `${ano}-${String(compMonth).padStart(2, '0')}`
-    setConfigs(prev => {
+    setConfigs((prev) => {
       debouncedSave(mk, {})
       return { ...prev, [mk]: {} }
     })
   }
 
   function preencherAno() {
-    if (!window.confirm(`Isso vai preencher automaticamente todos os meses de ${ano} com base no modelo de dias úteis. Configurações existentes serão substituídas. Continuar?`)) return
+    if (
+      !window.confirm(
+        `Isso vai preencher automaticamente todos os meses de ${ano} com base no modelo de dias úteis. Configurações existentes serão substituídas. Continuar?`
+      )
+    )
+      return
     for (let m = 1; m <= 12; m++) {
       const sched = nextMonth(ano, m)
       const filled = autoFill(sched.year, sched.month, modelo)
       const mk = `${ano}-${String(m).padStart(2, '0')}`
-      setConfigs(prev => ({ ...prev, [mk]: filled }))
+      setConfigs((prev) => ({ ...prev, [mk]: filled }))
       debouncedSave(mk, filled)
     }
   }
@@ -277,11 +290,17 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
         )}
         <div className={`flex items-center gap-2 ${compact ? 'ml-auto' : ''}`}>
           {isLoading && <Loader2 size={14} className="text-gray-400 animate-spin" />}
-          <button onClick={() => setAno(a => a - 1)} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => setAno((a) => a - 1)}
+            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
             <ChevronLeft size={16} className="text-gray-500" />
           </button>
           <span className="text-base font-bold text-gray-700 w-12 text-center">{ano}</span>
-          <button onClick={() => setAno(a => a + 1)} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => setAno((a) => a + 1)}
+            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
             <ChevronRight size={16} className="text-gray-500" />
           </button>
         </div>
@@ -299,9 +318,15 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
             </p>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            <span className={`text-sm font-bold tabular-nums ${
-              totalDias === 13 ? 'text-green-600' : totalDias < 13 ? 'text-amber-500' : 'text-red-500'
-            }`}>
+            <span
+              className={`text-sm font-bold tabular-nums ${
+                totalDias === 13
+                  ? 'text-green-600'
+                  : totalDias < 13
+                    ? 'text-amber-500'
+                    : 'text-red-500'
+              }`}
+            >
               {totalDias}d úteis
             </span>
             <button
@@ -329,9 +354,9 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                 min={0}
                 max={30}
                 value={m.dias}
-                onChange={e => {
+                onChange={(e) => {
                   const dias = Math.max(0, Math.min(30, Number(e.target.value) || 0))
-                  const next = modelo.map((s, j) => j === i ? { ...s, dias } : s)
+                  const next = modelo.map((s, j) => (j === i ? { ...s, dias } : s))
                   setModelo(next)
                   saveModelo(next)
                 }}
@@ -349,10 +374,10 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
           Pintura manual — clique ou arraste nos dias para ajustar
         </p>
         <div className="flex flex-wrap gap-2">
-          {ETAPAS.map(e => (
+          {ETAPAS.map((e) => (
             <button
               key={e.key}
-              onClick={() => setActiveStage(prev => prev === e.key ? null : e.key)}
+              onClick={() => setActiveStage((prev) => (prev === e.key ? null : e.key))}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border-2 ${
                 activeStage === e.key ? 'scale-105 shadow-sm' : 'border-transparent'
               }`}
@@ -362,7 +387,10 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                 color: e.color,
               }}
             >
-              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: e.color }} />
+              <span
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: e.color }}
+              />
               {e.key}
             </button>
           ))}
@@ -384,7 +412,9 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
       <div className="card p-0 overflow-hidden">
         <div
           className="overflow-x-auto"
-          onMouseLeave={() => { painting.current = false }}
+          onMouseLeave={() => {
+            painting.current = false
+          }}
         >
           <table className="border-collapse" style={{ minWidth: 980 }}>
             <thead>
@@ -422,7 +452,10 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                 const holidays = getHolidayMap(sched.year)
                 const dayMeta: Array<{ dow: number; holiday: string | undefined }> = []
                 for (let d = 1; d <= 31; d++) {
-                  if (d > maxDays) { dayMeta.push({ dow: -1, holiday: undefined }); continue }
+                  if (d > maxDays) {
+                    dayMeta.push({ dow: -1, holiday: undefined })
+                    continue
+                  }
                   const dow = new Date(sched.year, sched.month - 1, d).getDay()
                   const holiday = holidays.get(`${sched.month}-${d}`)
                   dayMeta.push({ dow, holiday })
@@ -434,7 +467,9 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                       <div className="flex flex-col">
                         <span className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
                           {MESES[m]}/{ano}
-                          <span className={`w-1.5 h-1.5 rounded-full inline-block ${hasConfig ? 'bg-green-400' : 'bg-gray-200'}`} />
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full inline-block ${hasConfig ? 'bg-green-400' : 'bg-gray-200'}`}
+                          />
                         </span>
                         <span className="text-[10px] text-gray-400 leading-none mt-0.5">
                           → {MESES[sched.month - 1]}/{sched.year}
@@ -453,7 +488,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                       const isWknd = valid && (dow === 0 || dow === 6)
 
                       const emptyBg = holiday ? '#FEFCE8' : isWknd ? '#F1F5F9' : '#F3F4F6'
-                      const letter  = holiday ? 'F' : dow === 0 ? 'D' : dow === 6 ? 'S' : null
+                      const letter = holiday ? 'F' : dow === 0 ? 'D' : dow === 6 ? 'S' : null
                       const letterColor = holiday ? '#D97706' : '#94A3B8'
                       const hoverCls = color ? 'hover:opacity-75' : 'hover:bg-gray-200'
 
@@ -462,7 +497,8 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                       const dowLabel = valid ? DOW_ABBR[dow] : ''
                       const statusLabel = holiday
                         ? `${holiday}${etapa ? ` · ${etapa}` : ''}`
-                        : etapa ?? (dow === 0 ? 'Domingo' : dow === 6 ? 'Sábado' : 'Não configurado')
+                        : (etapa ??
+                          (dow === 0 ? 'Domingo' : dow === 6 ? 'Sábado' : 'Não configurado'))
                       const title = valid ? `${dateStr} (${dowLabel}) — ${statusLabel}` : ''
 
                       return (
@@ -473,12 +509,15 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                                 isToday ? 'ring-2 ring-blue-400 ring-offset-1' : ''
                               } ${hoverCls}`}
                               style={{ backgroundColor: color ?? emptyBg }}
-                              onMouseDown={e => onCellDown(compMonth, day, e)}
+                              onMouseDown={(e) => onCellDown(compMonth, day, e)}
                               onMouseEnter={() => onCellEnter(compMonth, day)}
                               title={title}
                             >
                               {!color && letter && (
-                                <span className="text-[9px] font-bold leading-none select-none" style={{ color: letterColor }}>
+                                <span
+                                  className="text-[9px] font-bold leading-none select-none"
+                                  style={{ color: letterColor }}
+                                >
                                   {letter}
                                 </span>
                               )}
@@ -513,7 +552,9 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
         <Info size={13} className="flex-shrink-0 mt-0.5 text-gray-300" />
         <div className="space-y-1">
           <p>
-            Cada linha representa uma competência. Os dias mostrados são do <span className="font-semibold text-gray-500">mês seguinte</span> — o período em que a medição deve percorrer o fluxo.
+            Cada linha representa uma competência. Os dias mostrados são do{' '}
+            <span className="font-semibold text-gray-500">mês seguinte</span> — o período em que a
+            medição deve percorrer o fluxo.
           </p>
           <p>
             O anel azul indica hoje no período vigente.
@@ -522,15 +563,30 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
           </p>
           <div className="flex items-center gap-4 pt-0.5">
             <span className="flex items-center gap-1.5">
-              <span className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold" style={{ backgroundColor: '#F1F5F9', color: '#94A3B8' }}>D</span>
+              <span
+                className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold"
+                style={{ backgroundColor: '#F1F5F9', color: '#94A3B8' }}
+              >
+                D
+              </span>
               Domingo
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold" style={{ backgroundColor: '#F1F5F9', color: '#94A3B8' }}>S</span>
+              <span
+                className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold"
+                style={{ backgroundColor: '#F1F5F9', color: '#94A3B8' }}
+              >
+                S
+              </span>
               Sábado
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold" style={{ backgroundColor: '#FEFCE8', color: '#D97706' }}>F</span>
+              <span
+                className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold"
+                style={{ backgroundColor: '#FEFCE8', color: '#D97706' }}
+              >
+                F
+              </span>
               Feriado
             </span>
           </div>

@@ -1,13 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-import { BarChart3, Clock, AlertCircle } from "lucide-react";
-import { portalApi, parseUTC, ReportCard, resolveImageUrl } from "../../services/api";
-import { resolveThumbnailBySlug } from "../../panels/registry";
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { BarChart3, Clock, AlertCircle } from 'lucide-react'
+import { portalApi, parseUTC, ReportCard, resolveImageUrl } from '../../services/api'
+import { resolveThumbnailBySlug } from '../../panels/registry'
 
 function ReportCardItem({ report }: { report: ReportCard }) {
-  const navigate = useNavigate();
-  const Thumbnail = resolveThumbnailBySlug(report.panel_slug ?? report.slug);
-  const hasData = !!report.last_refreshed_at;
+  const navigate = useNavigate()
+  const Thumbnail = resolveThumbnailBySlug(report.panel_slug ?? report.slug)
+  const hasData = !!report.last_refreshed_at
 
   return (
     <div
@@ -17,7 +17,11 @@ function ReportCardItem({ report }: { report: ReportCard }) {
       {/* Thumbnail */}
       <div className="relative h-36 bg-gray-100 overflow-hidden border-b border-gray-100">
         {report.cover_image_url ? (
-          <img src={resolveImageUrl(report.cover_image_url, true)} alt={report.title} className="w-full h-full object-cover" />
+          <img
+            src={resolveImageUrl(report.cover_image_url, true)}
+            alt={report.title}
+            className="w-full h-full object-cover"
+          />
         ) : Thumbnail ? (
           <Thumbnail />
         ) : (
@@ -49,7 +53,7 @@ function ReportCardItem({ report }: { report: ReportCard }) {
             <>
               <Clock size={11} className="text-green-500 flex-shrink-0" />
               <span className="text-gray-400">
-                Atualizado em {parseUTC(report.last_refreshed_at)?.toLocaleDateString("pt-BR")}
+                Atualizado em {parseUTC(report.last_refreshed_at)?.toLocaleDateString('pt-BR')}
               </span>
             </>
           ) : (
@@ -61,21 +65,25 @@ function ReportCardItem({ report }: { report: ReportCard }) {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 export default function Portal() {
-  const { data: reports, isLoading, error } = useQuery({
-    queryKey: ["portal-reports"],
+  const {
+    data: reports,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['portal-reports'],
     queryFn: () => portalApi.listReports().then((r) => r.data),
-  });
+  })
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-2 border-gov-blue border-t-transparent rounded-full animate-spin" />
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -83,7 +91,7 @@ export default function Portal() {
       <div className="card p-8 text-center text-red-600">
         Erro ao carregar relatórios. Tente novamente.
       </div>
-    );
+    )
   }
 
   return (
@@ -108,5 +116,5 @@ export default function Portal() {
         </div>
       )}
     </div>
-  );
+  )
 }

@@ -1,22 +1,30 @@
-import enum
 from datetime import datetime
+from enum import StrEnum
 
 from sqlalchemy import (
-    Boolean, Column, DateTime, Enum, ForeignKey,
-    Integer, JSON, String, Text, UniqueConstraint,
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
 
 
-class UserRole(str, enum.Enum):
+class UserRole(StrEnum):
     admin = "admin"
     publisher = "publisher"
     viewer = "viewer"
 
 
-class ReportStatus(str, enum.Enum):
+class ReportStatus(StrEnum):
     draft = "draft"
     in_review = "in_review"
     published = "published"

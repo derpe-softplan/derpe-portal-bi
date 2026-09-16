@@ -29,7 +29,10 @@ export function ComboBox(props: ComboBoxProps) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!open) { setSearch(''); return }
+    if (!open) {
+      setSearch('')
+      return
+    }
     inputRef.current?.focus()
   }, [open])
 
@@ -41,11 +44,13 @@ export function ComboBox(props: ComboBoxProps) {
     return () => document.removeEventListener('mousedown', outside)
   }, [])
 
-  const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()))
+  const filtered = options.filter((o) => o.toLowerCase().includes(search.toLowerCase()))
   const isMulti = props.multiple === true
   const selected: string[] = isMulti
     ? (props.value as string[])
-    : ((props.value as string | null) ? [(props.value as string)] : [])
+    : (props.value as string | null)
+      ? [props.value as string]
+      : []
   const isActive = selected.length > 0
 
   function getLabel() {
@@ -56,7 +61,9 @@ export function ComboBox(props: ComboBoxProps) {
 
   function handleSelect(v: string) {
     if (props.multiple) {
-      const next = props.value.includes(v) ? props.value.filter(x => x !== v) : [...props.value, v]
+      const next = props.value.includes(v)
+        ? props.value.filter((x) => x !== v)
+        : [...props.value, v]
       props.onChange(next)
     } else {
       props.onChange(v)
@@ -72,13 +79,17 @@ export function ComboBox(props: ComboBoxProps) {
 
   return (
     <div ref={wrapRef} className="relative">
-      <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+      <label
+        className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isActive ? 'text-blue-600' : 'text-gray-500'}`}
+      >
         {label}
-        {isActive && <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-blue-500 align-middle" />}
+        {isActive && (
+          <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-blue-500 align-middle" />
+        )}
       </label>
       <button
         type="button"
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen((v) => !v)}
         title={isActive ? selected.join(', ') : undefined}
         className={`w-full flex items-center justify-between text-sm border rounded-lg px-3 py-2 bg-white cursor-pointer transition-colors ${
           isActive
@@ -87,7 +98,10 @@ export function ComboBox(props: ComboBoxProps) {
         } focus:outline-none focus:ring-2 focus:ring-blue-200`}
       >
         <span className="truncate">{getLabel()}</span>
-        <ChevronDown size={14} className={`ml-2 flex-shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          size={14}
+          className={`ml-2 flex-shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {open && (
@@ -100,7 +114,7 @@ export function ComboBox(props: ComboBoxProps) {
                 type="text"
                 placeholder="Pesquisar..."
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(e) => setSearch(e.target.value)}
                 className="w-full text-xs bg-transparent outline-none text-gray-700 placeholder-gray-400"
               />
             </div>
@@ -115,7 +129,7 @@ export function ComboBox(props: ComboBoxProps) {
                 {allLabel}
               </button>
             </li>
-            {filtered.map(o => (
+            {filtered.map((o) => (
               <li key={o}>
                 <button
                   type="button"
@@ -124,13 +138,21 @@ export function ComboBox(props: ComboBoxProps) {
                   className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors flex items-center gap-2.5 ${selected.includes(o) ? 'text-blue-700 bg-blue-50' : 'text-gray-700'}`}
                 >
                   {isMulti && (
-                    <span className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                      selected.includes(o) ? 'bg-blue-500 border-blue-500' : 'border-gray-300 bg-white'
-                    }`}>
-                      {selected.includes(o) && <Check size={10} className="text-white" strokeWidth={3} />}
+                    <span
+                      className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                        selected.includes(o)
+                          ? 'bg-blue-500 border-blue-500'
+                          : 'border-gray-300 bg-white'
+                      }`}
+                    >
+                      {selected.includes(o) && (
+                        <Check size={10} className="text-white" strokeWidth={3} />
+                      )}
                     </span>
                   )}
-                  <span className={`truncate ${selected.includes(o) ? 'font-semibold' : ''}`}>{o}</span>
+                  <span className={`truncate ${selected.includes(o) ? 'font-semibold' : ''}`}>
+                    {o}
+                  </span>
                 </button>
               </li>
             ))}
