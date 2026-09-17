@@ -9,7 +9,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.auth.deps import require_admin, require_publisher
+from app.auth.deps import require_admin, require_cronograma_editor, require_publisher
 from app.auth.service import hash_password
 from app.db.models import (
     Group,
@@ -64,6 +64,7 @@ class UserUpdate(BaseModel):
     role: UserRole | None = None
     is_active: bool | None = None
     password: str | None = None
+    can_edit_cronograma: bool | None = None
 
 
 class UserOut(BaseModel):
@@ -74,6 +75,7 @@ class UserOut(BaseModel):
     role: str
     is_active: bool
     must_change_password: bool = False
+    can_edit_cronograma: bool = False
     created_at: datetime
     model_config = {"from_attributes": True}
 
@@ -86,7 +88,8 @@ async def list_users(db: AsyncSession = Depends(get_db), _=Depends(require_admin
 
 @router.post("/users", response_model=UserOut, status_code=201)
 async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db), _=Depends(require_admin)):
-    existing_u = await db.execute(select(User).where(User.username == body.username))
+    username = body.username.strip().lower()
+    existing_u = await db.execute(select(User).where(User.username == username))
     if existing_u.scalar_one_or_none():
         raise HTTPException(400, "Nome de usuário já cadastrado")
     if body.email:
@@ -94,7 +97,7 @@ async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db), _=De
         if existing_e.scalar_one_or_none():
             raise HTTPException(400, "E-mail já cadastrado")
     user = User(
-        username=body.username,
+        username=username,
         email=body.email,
         full_name=body.full_name,
         hashed_password=hash_password(body.password),
@@ -114,7 +117,7 @@ async def update_user(user_id: int, body: UserUpdate, db: AsyncSession = Depends
     if not user:
         raise HTTPException(404, "Usuário não encontrado")
     if body.username is not None:
-        user.username = body.username
+        user.username = body.username.strip().lower()
     if body.email is not None:
         user.email = body.email or None
     if body.full_name is not None:
@@ -125,6 +128,8 @@ async def update_user(user_id: int, body: UserUpdate, db: AsyncSession = Depends
         user.is_active = body.is_active
     if body.password:
         user.hashed_password = hash_password(body.password)
+    if body.can_edit_cronograma is not None:
+        user.can_edit_cronograma = body.can_edit_cronograma
     await db.commit()
     await db.refresh(user)
     return user
@@ -499,7 +504,7 @@ async def upsert_cronograma(
     key: str,
     days: dict[str, str] = Body(...),
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_publisher),
+    _=Depends(require_cronograma_editor),
 ):
     await db.execute(
         text(
@@ -517,7 +522,7 @@ async def upsert_cronograma(
 async def delete_cronograma(
     key: str,
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_publisher),
+    _=Depends(require_cronograma_editor),
 ):
     await db.execute(text("DELETE FROM cronograma_config WHERE key = :key"), {"key": key})
     await db.commit()

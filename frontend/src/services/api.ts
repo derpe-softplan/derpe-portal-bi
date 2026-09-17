@@ -118,6 +118,7 @@ export interface UserMe {
   full_name: string
   role: 'admin' | 'publisher' | 'viewer'
   must_change_password: boolean
+  can_edit_cronograma: boolean
 }
 
 export interface UserAdmin extends UserMe {
@@ -140,6 +141,7 @@ export interface UserUpdate {
   role?: string
   is_active?: boolean
   password?: string
+  can_edit_cronograma?: boolean
 }
 
 export interface Group {

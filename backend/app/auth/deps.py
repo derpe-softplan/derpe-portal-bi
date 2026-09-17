@@ -37,3 +37,9 @@ async def require_publisher(user: User = Depends(get_current_user)) -> User:
     if user.role not in (UserRole.admin, UserRole.publisher):
         raise HTTPException(status_code=403, detail="Acesso restrito")
     return user
+
+
+async def require_cronograma_editor(user: User = Depends(get_current_user)) -> User:
+    if user.role != UserRole.admin and not user.can_edit_cronograma:
+        raise HTTPException(status_code=403, detail="Sem permissão para editar o cronograma")
+    return user

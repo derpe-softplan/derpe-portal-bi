@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Info, Loader2, Wand2 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { cronogramaApi } from '../../services/api'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
 
 // ── Etapas ────────────────────────────────────────────────────────────────────
 
@@ -171,6 +172,8 @@ function autoFill(
 export default function Cronograma({ compact = false }: { compact?: boolean }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const { user } = useAuth()
+  const canEdit = user?.role === 'admin' || user?.can_edit_cronograma === true
   const anoAtual = new Date().getFullYear()
   const [ano, setAno] = useState(anoAtual)
   const [activeStage, setActiveStage] = useState<string | null>(ETAPAS[0].key)
@@ -332,13 +335,15 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
             >
               {totalDias}d úteis
             </span>
-            <button
-              onClick={preencherAno}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gov-blue hover:bg-gov-blue-dark text-white text-xs font-semibold rounded-lg transition-colors"
-            >
-              <Wand2 size={13} />
-              Preencher {ano}
-            </button>
+            {canEdit && (
+              <button
+                onClick={preencherAno}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gov-blue hover:bg-gov-blue-dark text-white text-xs font-semibold rounded-lg transition-colors"
+              >
+                <Wand2 size={13} />
+                Preencher {ano}
+              </button>
+            )}
           </div>
         </div>
 
@@ -363,7 +368,8 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                   setModelo(next)
                   saveModelo(next)
                 }}
-                className="w-10 text-center text-xs font-semibold border border-gray-200 dark:border-gray-600 rounded-md py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white dark:bg-gray-700 dark:text-gray-200"
+                disabled={!canEdit}
+                className="w-10 text-center text-xs font-semibold border border-gray-200 dark:border-gray-600 rounded-md py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white dark:bg-gray-700 dark:text-gray-200 disabled:opacity-50 disabled:cursor-default"
               />
               <span className="text-xs text-gray-400 dark:text-gray-500">d</span>
             </div>
@@ -371,8 +377,8 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
 
-      {/* Paleta de etapas */}
-      <div className="card">
+      {/* Paleta de etapas — só para editores */}
+      {canEdit && <div className="card">
         <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
           Pintura manual — clique ou arraste nos dias para ajustar
         </p>
@@ -409,7 +415,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
             Borracha
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Tabela */}
       <div className="card p-0 overflow-hidden">
@@ -512,12 +518,12 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                         <td key={d} className="p-[2px]" style={{ userSelect: 'none' }}>
                           {valid ? (
                             <div
-                              className={`w-[22px] h-[22px] rounded cursor-pointer transition-all flex items-center justify-center ${
-                                isToday ? 'ring-2 ring-blue-400 ring-offset-1' : ''
-                              } ${hoverCls}`}
+                              className={`w-[22px] h-[22px] rounded transition-all flex items-center justify-center ${
+                                canEdit ? 'cursor-pointer' : 'cursor-default'
+                              } ${isToday ? 'ring-2 ring-blue-400 ring-offset-1' : ''} ${canEdit ? hoverCls : ''}`}
                               style={{ backgroundColor: color ?? emptyBg }}
-                              onMouseDown={(e) => onCellDown(compMonth, day, e)}
-                              onMouseEnter={() => onCellEnter(compMonth, day)}
+                              onMouseDown={canEdit ? (e) => onCellDown(compMonth, day, e) : undefined}
+                              onMouseEnter={canEdit ? () => onCellEnter(compMonth, day) : undefined}
                               title={title}
                             >
                               {!color && letter && (
@@ -537,7 +543,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                     })}
 
                     <td className="px-3 py-2 text-right">
-                      {hasConfig && (
+                      {canEdit && hasConfig && (
                         <button
                           onClick={() => clearRow(compMonth)}
                           className="text-[11px] text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 whitespace-nowrap"

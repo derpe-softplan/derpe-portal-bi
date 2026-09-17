@@ -35,6 +35,7 @@ class UserOut(BaseModel):
     full_name: str
     role: str
     must_change_password: bool = False
+    can_edit_cronograma: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -42,7 +43,7 @@ class UserOut(BaseModel):
 @router.post("/login")
 @limiter.limit("5/minute")
 async def login(request: Request, body: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.username == body.username))
+    result = await db.execute(select(User).where(User.username == body.username.strip().lower()))
     user = result.scalar_one_or_none()
     if not user or not user.is_active or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciais inválidas")

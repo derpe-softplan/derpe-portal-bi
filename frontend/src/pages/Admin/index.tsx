@@ -105,11 +105,11 @@ function UsersTab() {
   })
 
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [editForm, setEditForm] = useState({ username: '', email: '', full_name: '', role: '', password: '' })
+  const [editForm, setEditForm] = useState({ username: '', email: '', full_name: '', role: '', password: '', can_edit_cronograma: false })
 
   const openEdit = (u: UserAdmin) => {
     setEditingId(u.id)
-    setEditForm({ username: u.username ?? '', email: u.email ?? '', full_name: u.full_name, role: u.role, password: '' })
+    setEditForm({ username: u.username ?? '', email: u.email ?? '', full_name: u.full_name, role: u.role, password: '', can_edit_cronograma: u.can_edit_cronograma })
   }
 
   const saveUser = useMutation({
@@ -119,6 +119,7 @@ function UsersTab() {
         full_name: editForm.full_name || undefined,
         email: editForm.email || undefined,
         role: editForm.role || undefined,
+        can_edit_cronograma: editForm.can_edit_cronograma,
       }
       if (editForm.password) payload.password = editForm.password
       return adminApi.users.update(editingId!, payload)
@@ -317,6 +318,22 @@ function UsersTab() {
                             value={editForm.password}
                             onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
                           />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                            <button
+                              type="button"
+                              onClick={() => setEditForm((f) => ({ ...f, can_edit_cronograma: !f.can_edit_cronograma }))}
+                              className="flex-shrink-0"
+                            >
+                              {editForm.can_edit_cronograma
+                                ? <ToggleRight size={22} className="text-gov-blue" />
+                                : <ToggleLeft size={22} className="text-gray-300 dark:text-gray-600" />}
+                            </button>
+                            <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                              Pode editar o Cronograma
+                            </span>
+                          </label>
                         </div>
                         <div className="flex items-end gap-2">
                           <button className="btn-primary text-sm flex items-center gap-1.5" onClick={() => saveUser.mutate()}>

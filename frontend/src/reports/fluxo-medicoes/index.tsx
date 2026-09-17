@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react'
 import {
   ArrowRight,
+  ArrowDown,
   AlertTriangle,
   Banknote,
   ChevronUp,
@@ -20,9 +21,15 @@ import {
   Loader2,
   CheckCircle2,
   Clock,
+  Menu,
+  LayoutDashboard,
+  List,
+  CalendarDays,
+  TrendingUp,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { cronogramaApi, medicaoApi, type MedicaoAssinatura } from '../../services/api'
+import { useNavigate } from 'react-router-dom'
+import { cronogramaApi, medicaoApi, portalApi, type MedicaoAssinatura } from '../../services/api'
 import { useTheme } from '../../context/ThemeContext'
 import Cronograma from '../../pages/Cronograma'
 import { KpiCard } from '../../components/KpiCard'
@@ -487,7 +494,8 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
                   </div>
 
                   <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    <table className="w-full text-sm">
+                    <div className="overflow-x-auto touch-pan-x">
+                    <table className="w-full text-sm min-w-[360px]">
                       <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                         <tr>
                           <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -528,6 +536,7 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
                         })}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </>
               )}
@@ -621,7 +630,8 @@ function DrillModal({
                   </span>
                 </div>
                 <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <table className="w-full text-xs">
+                  <div className="overflow-x-auto touch-pan-x">
+                  <table className="w-full text-xs min-w-[400px]">
                     <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                       <tr>
                         <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -667,6 +677,7 @@ function DrillModal({
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
             )
@@ -748,7 +759,7 @@ function FunilCompleto({
           onRowClick={onRowClick}
         />
       )}
-      <div className="flex items-stretch gap-2 overflow-x-auto pb-2 pt-1">
+      <div className="flex flex-col md:flex-row md:items-stretch gap-2 md:overflow-x-auto pb-2 pt-1">
         {funil.map((item, i) => {
           const color = ETAPA_COLORS[item.etapa] ?? '#9CA3AF'
           const isActive = activeEtapa === item.etapa
@@ -756,7 +767,7 @@ function FunilCompleto({
           const diff = expected !== undefined ? item.quantidade - expected : null
 
           return (
-            <div key={item.etapa} className="flex items-center gap-2 flex-1 min-w-[148px]">
+            <div key={item.etapa} className="flex flex-col md:flex-row md:items-center gap-2 md:flex-1 md:min-w-[148px]">
               <button
                 onClick={() => onEtapaClick(isActive ? null : item.etapa)}
                 className="flex-1 h-full rounded-2xl p-4 text-left transition-all hover:shadow-md hover:-translate-y-0.5"
@@ -826,7 +837,10 @@ function FunilCompleto({
               </button>
 
               {i < funil.length - 1 && (
-                <ArrowRight size={14} className="flex-shrink-0 text-gray-300" />
+                <>
+                  <ArrowRight size={14} className="hidden md:block flex-shrink-0 text-gray-300" />
+                  <ArrowDown size={14} className="md:hidden mx-auto text-gray-300" />
+                </>
               )}
             </div>
           )
@@ -2177,10 +2191,18 @@ export function FluxoMedicoes({ data: rawData }: Props) {
   const [distritoFiltro, setDistritoFiltro] = useState<string[]>([])
   const [localSearch, setLocalSearch] = useState('')
   const [showHelp, setShowHelp] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [activePage, setActivePage] = useState<'resumo' | 'analitico' | 'rastreio' | 'cronograma'>(
     'resumo'
   )
   const [selectedRow, setSelectedRow] = useState<FluxoRow | null>(null)
+  const navigate = useNavigate()
+
+  const { data: otherReports = [] } = useQuery({
+    queryKey: ['portal-reports'],
+    queryFn: () => portalApi.listReports().then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+  })
 
   const tableRef = useRef<HTMLDivElement>(null)
 
@@ -2509,7 +2531,8 @@ export function FluxoMedicoes({ data: rawData }: Props) {
           onHelp={() => setShowHelp(true)}
         />
 
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1.5 inline-flex flex-wrap gap-1.5 w-full md:w-auto shadow-sm">
+        {/* Desktop: pill tabs */}
+        <div className="hidden md:inline-flex rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1.5 gap-1.5 shadow-sm">
           {[
             { id: 'resumo', label: 'Resumo' },
             { id: 'analitico', label: 'Análise' },
@@ -2533,6 +2556,85 @@ export function FluxoMedicoes({ data: rawData }: Props) {
             </button>
           ))}
         </div>
+
+        {/* Mobile: hamburger */}
+        <button
+          type="button"
+          onClick={() => setMenuOpen(true)}
+          className="md:hidden flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300 shadow-sm"
+        >
+          <Menu size={16} />
+          {{ resumo: 'Resumo', analitico: 'Análise', rastreio: 'Rastreio', cronograma: 'Cronograma' }[activePage]}
+        </button>
+
+        {/* Mobile drawer */}
+        {menuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} />
+            <div className="absolute left-0 top-0 bottom-0 w-72 bg-white dark:bg-gray-800 flex flex-col shadow-2xl">
+              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 dark:border-gray-700">
+                <span className="font-semibold text-gray-900 dark:text-gray-100">Menu</span>
+                <button onClick={() => setMenuOpen(false)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto py-3">
+                <p className="px-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  Visualizações
+                </p>
+                {([
+                  { id: 'resumo', label: 'Resumo', icon: <LayoutDashboard size={16} /> },
+                  { id: 'analitico', label: 'Análise', icon: <TrendingUp size={16} /> },
+                  { id: 'rastreio', label: 'Rastreio', icon: <List size={16} /> },
+                  { id: 'cronograma', label: 'Cronograma', icon: <CalendarDays size={16} /> },
+                ] as const).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setActivePage(tab.id)
+                      setEtapaFiltro(null)
+                      setMenuOpen(false)
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                      activePage === tab.id
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <span className={activePage === tab.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}>
+                      {tab.icon}
+                    </span>
+                    {tab.label}
+                  </button>
+                ))}
+
+                {otherReports.filter((r) => r.slug !== 'fluxo-medicoes').length > 0 && (
+                  <>
+                    <div className="my-2 border-t border-gray-100 dark:border-gray-700" />
+                    <p className="px-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                      Outros relatórios
+                    </p>
+                    {otherReports
+                      .filter((r) => r.slug !== 'fluxo-medicoes')
+                      .map((r) => (
+                        <button
+                          key={r.slug}
+                          type="button"
+                          onClick={() => navigate(`/relatorio/${r.slug}`)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <BarChart3 size={16} className="text-gray-400 dark:text-gray-500" />
+                          {r.title}
+                        </button>
+                      ))}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {activePage === 'resumo' && (
           <div className="space-y-5">
