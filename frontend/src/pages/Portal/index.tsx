@@ -5,6 +5,7 @@ import { BarChart3, Clock, AlertCircle } from 'lucide-react'
 import clsx from 'clsx'
 import { portalApi, parseUTC, ReportCard, resolveImageUrl } from '../../services/api'
 import { resolveThumbnailBySlug } from '../../panels/registry'
+import { useAuth } from '../../context/AuthContext'
 
 const SISTEMAS = ['SMO', 'CQM', 'SGF', 'SCO']
 const TIPOS = ['Obras', 'Financeiro', 'Orçamento', 'Gerencial']
@@ -20,7 +21,7 @@ function ReportCardItem({ report }: { report: ReportCard }) {
       onClick={() => navigate(`/relatorio/${report.slug}`)}
     >
       {/* Thumbnail */}
-      <div className="relative h-36 bg-gray-100 overflow-hidden border-b border-gray-100">
+      <div className="relative h-36 bg-gray-100 dark:bg-gray-700 overflow-hidden border-b border-gray-100 dark:border-gray-600">
         {report.cover_image_url ? (
           <img
             src={resolveImageUrl(report.cover_image_url, true)}
@@ -31,11 +32,11 @@ function ReportCardItem({ report }: { report: ReportCard }) {
           <Thumbnail />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <BarChart3 size={36} className="text-gray-200" />
+            <BarChart3 size={36} className="text-gray-200 dark:text-gray-600" />
           </div>
         )}
         {!hasData && (
-          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+          <div className="absolute inset-0 bg-white/70 dark:bg-gray-800/70 flex items-center justify-center">
             <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
               Aguardando dados
             </span>
@@ -45,7 +46,7 @@ function ReportCardItem({ report }: { report: ReportCard }) {
 
       {/* Body */}
       <div className="p-4">
-        <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-gov-blue transition-colors leading-snug">
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-gov-blue dark:group-hover:text-blue-400 transition-colors leading-snug">
           {report.title}
         </h3>
 
@@ -89,7 +90,7 @@ function FilterChip({
         'px-3 py-1 rounded-full text-xs font-semibold border transition-colors',
         active
           ? 'bg-gov-blue text-white border-gov-blue'
-          : 'bg-white text-gray-500 border-gray-200 hover:border-gov-blue hover:text-gov-blue'
+          : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:border-gov-blue hover:text-gov-blue'
       )}
     >
       {label}
@@ -98,6 +99,7 @@ function FilterChip({
 }
 
 export default function Portal() {
+  const { user } = useAuth()
   const [filterSistemas, setFilterSistemas] = useState<string[]>([])
   const [filterTipos, setFilterTipos] = useState<string[]>([])
 
@@ -143,8 +145,11 @@ export default function Portal() {
   return (
     <div>
       <div className="mb-5">
-        <h1 className="text-2xl font-semibold text-gray-900">Relatórios disponíveis</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-gov-blue dark:text-blue-400 font-medium mb-0.5">
+          Olá, {user?.full_name?.split(' ')[0]}!
+        </p>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Relatórios disponíveis</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           {filtered.length} relatório(s) publicado(s) para o seu perfil
         </p>
       </div>
@@ -153,7 +158,7 @@ export default function Portal() {
       {reports && reports.length > 0 && (
         <div className="card px-4 py-3 mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
               Sistema
             </span>
             {SISTEMAS.map((s) => (
@@ -166,7 +171,7 @@ export default function Portal() {
             ))}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
               Tipo
             </span>
             {TIPOS.map((t) => (

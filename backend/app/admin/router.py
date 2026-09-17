@@ -73,6 +73,7 @@ class UserOut(BaseModel):
     full_name: str
     role: str
     is_active: bool
+    must_change_password: bool = False
     created_at: datetime
     model_config = {"from_attributes": True}
 
@@ -98,6 +99,7 @@ async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db), _=De
         full_name=body.full_name,
         hashed_password=hash_password(body.password),
         role=body.role,
+        must_change_password=True,
     )
     db.add(user)
     await db.commit()

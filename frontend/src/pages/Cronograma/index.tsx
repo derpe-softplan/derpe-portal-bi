@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Info, Loader2, Wand2 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { cronogramaApi } from '../../services/api'
+import { useTheme } from '../../context/ThemeContext'
 
 // ── Etapas ────────────────────────────────────────────────────────────────────
 
@@ -168,6 +169,8 @@ function autoFill(
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export default function Cronograma({ compact = false }: { compact?: boolean }) {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
   const anoAtual = new Date().getFullYear()
   const [ano, setAno] = useState(anoAtual)
   const [activeStage, setActiveStage] = useState<string | null>(ETAPAS[0].key)
@@ -282,8 +285,8 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
       <div className="flex items-start justify-between flex-wrap gap-3">
         {!compact && (
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Cronograma</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Cronograma</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               Configure a etapa esperada por dia para cada competência de medição.
             </p>
           </div>
@@ -292,14 +295,14 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
           {isLoading && <Loader2 size={14} className="text-gray-400 animate-spin" />}
           <button
             onClick={() => setAno((a) => a - 1)}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             <ChevronLeft size={16} className="text-gray-500" />
           </button>
-          <span className="text-base font-bold text-gray-700 w-12 text-center">{ano}</span>
+          <span className="text-base font-bold text-gray-700 dark:text-gray-300 w-12 text-center">{ano}</span>
           <button
             onClick={() => setAno((a) => a + 1)}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             <ChevronRight size={16} className="text-gray-500" />
           </button>
@@ -310,10 +313,10 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
       <div className="card">
         <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Modelo de dias úteis por etapa
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
               Fins de semana e feriados não contam. Dias 0 pulam a etapa.
             </p>
           </div>
@@ -346,7 +349,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                 className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                 style={{ backgroundColor: ETAPA_COLOR[m.stage] }}
               />
-              <span className="text-xs text-gray-600 whitespace-nowrap">
+              <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                 {STAGE_SHORT[m.stage]}
               </span>
               <input
@@ -360,9 +363,9 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                   setModelo(next)
                   saveModelo(next)
                 }}
-                className="w-10 text-center text-xs font-semibold border border-gray-200 rounded-md py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+                className="w-10 text-center text-xs font-semibold border border-gray-200 dark:border-gray-600 rounded-md py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white dark:bg-gray-700 dark:text-gray-200"
               />
-              <span className="text-xs text-gray-400">d</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">d</span>
             </div>
           ))}
         </div>
@@ -370,7 +373,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
 
       {/* Paleta de etapas */}
       <div className="card">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+        <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
           Pintura manual — clique ou arraste nos dias para ajustar
         </p>
         <div className="flex flex-wrap gap-2">
@@ -398,8 +401,8 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
             onClick={() => setActiveStage(null)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${
               activeStage === null
-                ? 'bg-gray-100 border-gray-400 text-gray-700'
-                : 'border-transparent text-gray-400 hover:bg-gray-50'
+                ? 'bg-gray-100 dark:bg-gray-700 border-gray-400 dark:border-gray-500 text-gray-700 dark:text-gray-300'
+                : 'border-transparent text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
           >
             <span className="w-2.5 h-2.5 rounded-full bg-gray-300 flex-shrink-0" />
@@ -418,9 +421,9 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
         >
           <table className="border-collapse" style={{ minWidth: 980 }}>
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+              <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                 <th
-                  className="text-left text-xs font-semibold text-gray-500 px-4 py-2.5 whitespace-nowrap sticky left-0 bg-gray-50 z-10 border-r border-gray-200"
+                  className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 px-4 py-2.5 whitespace-nowrap sticky left-0 bg-gray-50 dark:bg-gray-900 z-10 border-r border-gray-200 dark:border-gray-700"
                   style={{ minWidth: 150 }}
                 >
                   Competência
@@ -428,7 +431,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                 {Array.from({ length: 31 }, (_, i) => (
                   <th
                     key={i}
-                    className="text-center text-xs text-gray-400 py-2.5 select-none"
+                    className="text-center text-xs text-gray-400 dark:text-gray-600 py-2.5 select-none"
                     style={{ width: 26, minWidth: 26 }}
                   >
                     {String(i + 1).padStart(2, '0')}
@@ -437,7 +440,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                 <th style={{ minWidth: 60 }} />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {Array.from({ length: 12 }, (_, m) => {
                 const compMonth = m + 1
                 const mk = `${ano}-${String(compMonth).padStart(2, '0')}`
@@ -462,16 +465,16 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                 }
 
                 return (
-                  <tr key={m} className="hover:bg-gray-50/60 group">
-                    <td className="px-4 py-2 sticky left-0 bg-white group-hover:bg-gray-50/60 z-10 border-r border-gray-100">
+                  <tr key={m} className="hover:bg-gray-50/60 dark:hover:bg-gray-700/30 group">
+                    <td className="px-4 py-2 sticky left-0 bg-white dark:bg-gray-800 group-hover:bg-gray-50/60 dark:group-hover:bg-gray-700/30 z-10 border-r border-gray-100 dark:border-gray-700">
                       <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
                           {MESES[m]}/{ano}
                           <span
                             className={`w-1.5 h-1.5 rounded-full inline-block ${hasConfig ? 'bg-green-400' : 'bg-gray-200'}`}
                           />
                         </span>
-                        <span className="text-[10px] text-gray-400 leading-none mt-0.5">
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 leading-none mt-0.5">
                           → {MESES[sched.month - 1]}/{sched.year}
                         </span>
                       </div>
@@ -487,7 +490,11 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
                       const { dow, holiday } = dayMeta[d]
                       const isWknd = valid && (dow === 0 || dow === 6)
 
-                      const emptyBg = holiday ? '#FEFCE8' : isWknd ? '#F1F5F9' : '#F3F4F6'
+                      const emptyBg = holiday
+                        ? (isDark ? '#292109' : '#FEFCE8')
+                        : isWknd
+                          ? (isDark ? '#1e293b' : '#F1F5F9')
+                          : (isDark ? '#374151' : '#F3F4F6')
                       const letter = holiday ? 'F' : dow === 0 ? 'D' : dow === 6 ? 'S' : null
                       const letterColor = holiday ? '#D97706' : '#94A3B8'
                       const hoverCls = color ? 'hover:opacity-75' : 'hover:bg-gray-200'
@@ -548,12 +555,12 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
       </div>
 
       {/* Instruções */}
-      <div className="flex items-start gap-2 text-xs text-gray-400 pb-2">
-        <Info size={13} className="flex-shrink-0 mt-0.5 text-gray-300" />
+      <div className="flex items-start gap-2 text-xs text-gray-400 dark:text-gray-500 pb-2">
+        <Info size={13} className="flex-shrink-0 mt-0.5 text-gray-300 dark:text-gray-600" />
         <div className="space-y-1">
           <p>
             Cada linha representa uma competência. Os dias mostrados são do{' '}
-            <span className="font-semibold text-gray-500">mês seguinte</span> — o período em que a
+            <span className="font-semibold text-gray-500 dark:text-gray-400">mês seguinte</span> — o período em que a
             medição deve percorrer o fluxo.
           </p>
           <p>
@@ -565,7 +572,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
             <span className="flex items-center gap-1.5">
               <span
                 className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold"
-                style={{ backgroundColor: '#F1F5F9', color: '#94A3B8' }}
+                style={{ backgroundColor: isDark ? '#1e293b' : '#F1F5F9', color: '#94A3B8' }}
               >
                 D
               </span>
@@ -574,7 +581,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
             <span className="flex items-center gap-1.5">
               <span
                 className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold"
-                style={{ backgroundColor: '#F1F5F9', color: '#94A3B8' }}
+                style={{ backgroundColor: isDark ? '#1e293b' : '#F1F5F9', color: '#94A3B8' }}
               >
                 S
               </span>
@@ -583,7 +590,7 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
             <span className="flex items-center gap-1.5">
               <span
                 className="inline-flex w-4 h-4 rounded items-center justify-center text-[9px] font-bold"
-                style={{ backgroundColor: '#FEFCE8', color: '#D97706' }}
+                style={{ backgroundColor: isDark ? '#292109' : '#FEFCE8', color: '#D97706' }}
               >
                 F
               </span>

@@ -1,9 +1,12 @@
 import { FormEvent, useState } from 'react'
+import { Moon, Sun } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
 
 export default function Login() {
   const { login } = useAuth()
+  const { theme, toggle } = useTheme()
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -107,7 +110,16 @@ export default function Login() {
       </div>
 
       {/* ── Painel direito ──────────────────────────────────────────────── */}
-      <div className="w-full lg:w-2/5 flex flex-col justify-center px-8 sm:px-14 bg-white">
+      <div className="relative w-full lg:w-2/5 flex flex-col justify-center px-8 sm:px-14 bg-white dark:bg-gray-900">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
+          className="absolute right-4 top-4 inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:border-gov-blue hover:text-gov-blue dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-blue-500 dark:hover:text-blue-400"
+        >
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+
         <div className="max-w-sm w-full mx-auto">
           {/* Logo mobile */}
           <div className="flex items-center gap-2 mb-10 lg:mb-8">
@@ -115,19 +127,19 @@ export default function Login() {
               <div className="w-4 h-4 border-2 border-white rounded-sm" />
             </div>
             <div>
-              <p className="text-xs text-gray-400 uppercase tracking-widest font-medium">DER-PE</p>
-              <h2 className="text-xl font-semibold text-gray-900">Portal BI</h2>
+              <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-widest font-medium">DER-PE</p>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Portal BI</h2>
             </div>
           </div>
 
           <div className="mb-8">
-            <h3 className="text-2xl font-semibold text-gray-900">Bem-vindo</h3>
-            <p className="text-sm text-gray-500 mt-1">Entre com suas credenciais de acesso</p>
+            <h3 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Bem-vindo</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Entre com suas credenciais de acesso</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Usuário
               </label>
               <input
@@ -142,7 +154,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Senha</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Senha</label>
               <input
                 type="password"
                 className="input"
@@ -169,10 +181,10 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-10 pt-6 border-t border-gray-100">
+          <div className="mt-10 pt-6 border-t border-gray-100 dark:border-gray-700">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-gov-yellow rounded-full" />
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 dark:text-gray-500">
                 Acesso restrito a servidores autorizados do DER-PE
               </p>
             </div>

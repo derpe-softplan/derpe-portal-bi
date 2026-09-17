@@ -41,6 +41,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.viewer)
     is_active = Column(Boolean, nullable=False, default=True)
+    must_change_password = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     memberships = relationship("UserGroup", back_populates="user", cascade="all, delete-orphan")

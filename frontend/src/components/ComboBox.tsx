@@ -80,7 +80,7 @@ export function ComboBox(props: ComboBoxProps) {
   return (
     <div ref={wrapRef} className="relative">
       <label
-        className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isActive ? 'text-blue-600' : 'text-gray-500'}`}
+        className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isActive ? 'text-blue-600' : 'text-gray-500 dark:text-gray-400'}`}
       >
         {label}
         {isActive && (
@@ -91,11 +91,11 @@ export function ComboBox(props: ComboBoxProps) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         title={isActive ? selected.join(', ') : undefined}
-        className={`w-full flex items-center justify-between text-sm border rounded-lg px-3 py-2 bg-white cursor-pointer transition-colors ${
+        className={`w-full flex items-center justify-between text-sm border rounded-lg px-3 py-2 bg-white dark:bg-gray-700 cursor-pointer transition-colors ${
           isActive
-            ? 'border-blue-400 text-blue-700 bg-blue-50'
-            : 'border-gray-200 text-gray-700 hover:border-gray-300'
-        } focus:outline-none focus:ring-2 focus:ring-blue-200`}
+            ? 'border-blue-400 text-blue-700 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-600'
+            : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
+        } focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800`}
       >
         <span className="truncate">{getLabel()}</span>
         <ChevronDown
@@ -105,9 +105,9 @@ export function ComboBox(props: ComboBoxProps) {
       </button>
 
       {open && (
-        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden min-w-[160px]">
-          <div className="p-2 border-b border-gray-100">
-            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-50 rounded-md">
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-hidden min-w-[160px]">
+          <div className="p-2 border-b border-gray-100 dark:border-gray-700">
+            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-50 dark:bg-gray-700 rounded-md">
               <Search size={13} className="text-gray-400 flex-shrink-0" />
               <input
                 ref={inputRef}
@@ -115,7 +115,7 @@ export function ComboBox(props: ComboBoxProps) {
                 placeholder="Pesquisar..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full text-xs bg-transparent outline-none text-gray-700 placeholder-gray-400"
+                className="w-full text-xs bg-transparent outline-none text-gray-700 dark:text-gray-200 placeholder-gray-400"
               />
             </div>
           </div>
@@ -124,7 +124,7 @@ export function ComboBox(props: ComboBoxProps) {
               <button
                 type="button"
                 onClick={handleClear}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${!isActive ? 'font-semibold text-blue-600 bg-blue-50' : 'text-gray-500 italic'}`}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${!isActive ? 'font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 italic'}`}
               >
                 {allLabel}
               </button>
@@ -135,14 +135,14 @@ export function ComboBox(props: ComboBoxProps) {
                   type="button"
                   onClick={() => handleSelect(o)}
                   title={o}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors flex items-center gap-2.5 ${selected.includes(o) ? 'text-blue-700 bg-blue-50' : 'text-gray-700'}`}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-2.5 ${selected.includes(o) ? 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-700 dark:text-gray-200'}`}
                 >
                   {isMulti && (
                     <span
                       className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
                         selected.includes(o)
                           ? 'bg-blue-500 border-blue-500'
-                          : 'border-gray-300 bg-white'
+                          : 'border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-600'
                       }`}
                     >
                       {selected.includes(o) && (
@@ -157,15 +157,15 @@ export function ComboBox(props: ComboBoxProps) {
               </li>
             ))}
             {filtered.length === 0 && (
-              <li className="px-3 py-3 text-xs text-gray-400 text-center">Nenhum resultado</li>
+              <li className="px-3 py-3 text-xs text-gray-400 dark:text-gray-500 text-center">Nenhum resultado</li>
             )}
           </ul>
           {isMulti && (
-            <div className="p-2 border-t border-gray-100">
+            <div className="p-2 border-t border-gray-100 dark:border-gray-700">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="w-full text-xs font-semibold text-blue-600 hover:text-blue-800 py-1.5 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+                className="w-full text-xs font-semibold text-blue-600 hover:text-blue-800 py-1.5 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 rounded-md transition-colors"
               >
                 {isActive ? `Confirmar (${selected.length})` : 'Fechar'}
               </button>

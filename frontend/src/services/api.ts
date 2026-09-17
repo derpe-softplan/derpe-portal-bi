@@ -40,6 +40,10 @@ export const authApi = {
     api.post<{ user: UserMe }>('/auth/login', { username, password }),
   logout: () => api.post('/auth/logout'),
   me: () => api.get<UserMe>('/auth/me'),
+  changePassword: (current_password: string, new_password: string) =>
+    api.post<{ user: UserMe }>('/auth/change-password', { current_password, new_password }),
+  updateProfile: (data: { full_name?: string; email?: string }) =>
+    api.put<{ user: UserMe }>('/auth/profile', data),
 }
 
 // ── Portal ────────────────────────────────────────────────────────────────────
@@ -113,6 +117,7 @@ export interface UserMe {
   email: string | null
   full_name: string
   role: 'admin' | 'publisher' | 'viewer'
+  must_change_password: boolean
 }
 
 export interface UserAdmin extends UserMe {

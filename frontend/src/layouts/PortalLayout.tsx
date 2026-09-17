@@ -1,8 +1,9 @@
 import { ReactNode } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, LayoutDashboard, LogOut, Settings } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+import { BarChart3, LayoutDashboard, LogOut, Moon, Settings, Sun, User } from 'lucide-react'
 import clsx from 'clsx'
+import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 
 export default function PortalLayout({
   children,
@@ -12,6 +13,7 @@ export default function PortalLayout({
   wide?: boolean
 }) {
   const { user, logout } = useAuth()
+  const { theme, toggle } = useTheme()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
@@ -23,7 +25,7 @@ export default function PortalLayout({
   const isViewer = user?.role === 'viewer'
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col dark:bg-gray-900">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <header className="bg-gov-blue text-white shadow-md z-10">
         <div className="bg-gov-blue-dark text-xs py-1 px-4 flex items-center gap-2 opacity-90">
@@ -59,29 +61,44 @@ export default function PortalLayout({
               </NavLink>
 
               {isPublisher && (
-                <>
-                  <NavLink
-                    to="/admin"
-                    className={({ isActive }) =>
-                      clsx(
-                        'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                        isActive ? 'bg-white/20' : 'hover:bg-white/10'
-                      )
-                    }
-                  >
-                    <Settings size={15} />
-                    Admin
-                  </NavLink>
-                </>
+                <NavLink
+                  to="/admin"
+                  className={({ isActive }) =>
+                    clsx(
+                      'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                      isActive ? 'bg-white/20' : 'hover:bg-white/10'
+                    )
+                  }
+                >
+                  <Settings size={15} />
+                  Admin
+                </NavLink>
               )}
             </nav>
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <div className="hidden sm:block text-right">
               <p className="text-sm font-medium leading-none">{user?.full_name}</p>
-              <p className="text-xs opacity-60 mt-0.5">{user?.email}</p>
+              <p className="text-xs opacity-60 mt-0.5">{user?.email ?? user?.username}</p>
             </div>
+
+            <button
+              onClick={toggle}
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+            >
+              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+
+            <button
+              onClick={() => navigate('/perfil')}
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              title="Meu perfil"
+            >
+              <User size={16} />
+            </button>
+
             <button
               onClick={handleLogout}
               className="p-2 rounded-lg hover:bg-white/10 transition-colors"
@@ -103,7 +120,7 @@ export default function PortalLayout({
         {children}
       </main>
 
-      <footer className="border-t border-gray-200 py-4 px-8 text-center text-xs text-gray-400">
+      <footer className="border-t border-gray-200 dark:border-gray-700 py-4 px-8 text-center text-xs text-gray-400 dark:text-gray-500">
         DER-PE · Portal BI © {new Date().getFullYear()} · Governo de Pernambuco
       </footer>
     </div>

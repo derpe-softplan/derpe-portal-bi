@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { cronogramaApi, medicaoApi, type MedicaoAssinatura } from '../../services/api'
+import { useTheme } from '../../context/ThemeContext'
 import Cronograma from '../../pages/Cronograma'
 import { KpiCard } from '../../components/KpiCard'
 import { ComboBox } from '../../components/ComboBox'
@@ -263,13 +264,13 @@ function etapaBadge(etapa: string) {
 function diasBadge(etapa: string, dias: number) {
   if (etapa === 'Paga integralmente')
     return <span className="text-xs font-semibold text-emerald-600">Concluída</span>
-  if (!ETAPAS_CRITICAS.has(etapa)) return <span className="text-xs text-gray-400">{dias}d</span>
+  if (!ETAPAS_CRITICAS.has(etapa)) return <span className="text-xs text-gray-400 dark:text-gray-500">{dias}d</span>
   const cls =
     dias >= 30
-      ? 'bg-red-100 text-red-700 font-bold'
+      ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-bold'
       : dias >= 15
-        ? 'bg-amber-100 text-amber-700 font-semibold'
-        : 'bg-gray-100 text-gray-500'
+        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-semibold'
+        : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
   return <span className={`text-xs px-2 py-0.5 rounded-full ${cls}`}>{dias}d</span>
 }
 
@@ -284,9 +285,9 @@ const fmtDate = (s: string | null | undefined) => {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{label}</dt>
-      <dd className="text-sm text-gray-800 mt-0.5 leading-snug">
-        {children ?? <span className="text-gray-300">—</span>}
+      <dt className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">{label}</dt>
+      <dd className="text-sm text-gray-800 dark:text-gray-200 mt-0.5 leading-snug">
+        {children ?? <span className="text-gray-300 dark:text-gray-600">—</span>}
       </dd>
     </div>
   )
@@ -318,15 +319,15 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] flex flex-col"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabeçalho */}
-        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-100">
+        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="min-w-0">
-            <p className="text-base font-bold text-gray-900 truncate">{row.empresa}</p>
-            <div className="flex items-center gap-2 mt-1 flex-wrap text-xs text-gray-500">
-              <span className="font-mono font-semibold text-gray-700">{row.contrato}</span>
+            <p className="text-base font-bold text-gray-900 dark:text-gray-100 truncate">{row.empresa}</p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap text-xs text-gray-500 dark:text-gray-400">
+              <span className="font-mono font-semibold text-gray-700 dark:text-gray-300">{row.contrato}</span>
               <span className="text-gray-300">·</span>
               <span>Medição #{row.num_medicao}</span>
               <span className="text-gray-300">·</span>
@@ -348,7 +349,7 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
             )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
               <X size={18} />
             </button>
@@ -356,7 +357,7 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
         </div>
 
         {/* Abas */}
-        <div className="flex border-b border-gray-100 px-6">
+        <div className="flex border-b border-gray-100 dark:border-gray-700 px-6">
           {[
             { id: 'detalhes', label: 'Detalhes' },
             {
@@ -370,7 +371,7 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
               className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors -mb-px ${
                 tab === t.id
                   ? 'border-gov-blue text-gov-blue'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
             >
               {t.label}
@@ -384,7 +385,7 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
           {tab === 'detalhes' && (
             <div className="space-y-5">
               <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+                <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
                   Situação atual
                 </p>
                 <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
@@ -402,8 +403,8 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
                 </dl>
               </div>
 
-              <div className="border-t border-gray-100 pt-4">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+              <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
                   Identificação
                 </p>
                 <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
@@ -422,8 +423,8 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
                 </dl>
               </div>
 
-              <div className="border-t border-gray-100 pt-4">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+              <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
                   Financeiro
                 </p>
                 <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
@@ -441,8 +442,8 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
                 </dl>
               </div>
 
-              <div className="border-t border-gray-100 pt-4">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+              <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
                   Datas
                 </p>
                 <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
@@ -485,30 +486,30 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
                     )}
                   </div>
 
-                  <div className="rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b border-gray-200">
+                      <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                         <tr>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Papel
                           </th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Fiscal
                           </th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Situação
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                         {validAssinaturas.map((a: MedicaoAssinatura, i: number) => {
                           const assinado = a.nmsituacao === 'ASSINADO'
                           return (
-                            <tr key={i} className={assinado ? '' : 'bg-amber-50/40'}>
-                              <td className="px-4 py-3 text-sm text-gray-700">
+                            <tr key={i} className={assinado ? '' : 'bg-amber-50/40 dark:bg-amber-900/10'}>
+                              <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                                 {a.nmpapel ?? '—'}
                               </td>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-800">
+                              <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-gray-200">
                                 {a.nmfiscal ?? '—'}
                               </td>
                               <td className="px-4 py-3">
@@ -570,25 +571,25 @@ function DrillModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] flex flex-col"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-100">
+        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <div>
-            <p className="text-base font-bold text-gray-900">
+            <p className="text-base font-bold text-gray-900 dark:text-gray-100">
               Esperado:{' '}
               <span style={{ color: ETAPA_COLORS[expectedStage] ?? '#6B7280' }}>
                 {expectedStage}
               </span>
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
               {rows.length} {rows.length !== 1 ? 'medições' : 'medição'} · clique em uma linha para
               ver detalhes
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <X size={18} />
           </button>
@@ -619,29 +620,29 @@ function DrillModal({
                     {etapaRows.length} {etapaRows.length !== 1 ? 'medições' : 'medição'}
                   </span>
                 </div>
-                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <table className="w-full text-xs">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                       <tr>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           Empresa
                         </th>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           Contrato
                         </th>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           Comp.
                         </th>
-                        <th className="px-3 py-2 text-right font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="px-3 py-2 text-right font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           Valor
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                       {etapaRows.map((r) => (
                         <tr
                           key={r.id}
-                          className="hover:bg-gray-50 cursor-pointer transition-colors"
+                          className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
                           onClick={() => {
                             onRowClick?.(r)
                             onClose()
@@ -649,17 +650,17 @@ function DrillModal({
                         >
                           <td className="px-3 py-2 max-w-[160px]">
                             <span
-                              className="block truncate font-medium text-gray-800"
+                              className="block truncate font-medium text-gray-800 dark:text-gray-200"
                               title={r.empresa}
                             >
                               {r.empresa || '—'}
                             </span>
                           </td>
-                          <td className="px-3 py-2 font-mono text-gray-600 whitespace-nowrap">
-                            {r.contrato} <span className="text-gray-400">#{r.num_medicao}</span>
+                          <td className="px-3 py-2 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            {r.contrato} <span className="text-gray-400 dark:text-gray-500">#{r.num_medicao}</span>
                           </td>
-                          <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.mes_ano}</td>
-                          <td className="px-3 py-2 text-right font-semibold text-gray-700 whitespace-nowrap">
+                          <td className="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">{r.mes_ano}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
                             {brl(r.vlevento)}
                           </td>
                         </tr>
@@ -773,10 +774,10 @@ function FunilCompleto({
                 </div>
 
                 {/* Contador principal */}
-                <div className="text-[28px] font-bold text-gray-900 leading-none tabular-nums">
+                <div className="text-[28px] font-bold text-gray-900 dark:text-gray-100 leading-none tabular-nums">
                   {fmtNum(item.quantidade)}
                 </div>
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                   {item.quantidade === 1 ? 'medição' : 'medições'} &middot; {item.percentual}%
                 </div>
 
@@ -786,14 +787,14 @@ function FunilCompleto({
                 </div>
 
                 {/* Valor financeiro */}
-                <div className="text-xs text-gray-400 mt-0.5">{brl(item.valor)}</div>
+                <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{brl(item.valor)}</div>
 
                 {/* Comparação com cronograma */}
                 {expected !== undefined && (
                   <div className="mt-3 pt-2.5 border-t" style={{ borderColor: color + '25' }}>
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-gray-400">Esperado</span>
-                      <span className="text-[11px] font-semibold text-gray-600 tabular-nums">
+                      <span className="text-[11px] text-gray-400 dark:text-gray-500">Esperado</span>
+                      <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 tabular-nums">
                         {fmtNum(expected)}
                       </span>
                     </div>
@@ -858,70 +859,70 @@ function ContratosVencendoModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 rounded-t-2xl">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-red-100 rounded-lg">
-              <Calendar size={16} className="text-red-600" />
+            <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg">
+              <Calendar size={16} className="text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-gray-800">
+              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">
                 Contratos vencendo nos próximos 60 dias
               </h2>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 dark:text-gray-500">
                 {contratos.length} contrato{contratos.length !== 1 ? 's' : ''}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <X size={18} />
           </button>
         </div>
         <div className="overflow-y-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+            <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0">
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Contrato
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Empresa
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Rodovia
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   Vencimento
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Dias
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {contratos.map((c) => {
                 const urgente = c.diasRestantes <= 15
                 const atencao = c.diasRestantes <= 30
                 return (
-                  <tr key={c.contrato} className="hover:bg-gray-50">
-                    <td className="px-4 py-2.5 font-mono text-xs font-semibold text-gray-700 whitespace-nowrap">
+                  <tr key={c.contrato} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-4 py-2.5 font-mono text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
                       {c.contrato}
                     </td>
                     <td
-                      className="px-4 py-2.5 text-xs text-gray-700 max-w-[200px] truncate"
+                      className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300 max-w-[200px] truncate"
                       title={c.empresa}
                     >
                       {c.empresa}
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                    <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                       {c.rodovias || '—'}
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap">
+                    <td className="px-4 py-2.5 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       {c.vencimento.toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">
@@ -1028,12 +1029,12 @@ function AlertasPanel({
               />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Saldo Insuf. de Empenho
               </p>
-              <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight mt-0.5">
                 {fmtNum(saldoInsuficiente.quantidade)}
-                <span className="text-sm font-normal text-gray-500 ml-1.5">contratos</span>
+                <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-1.5">contratos</span>
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
                 Saldo disponível: {brl(saldoInsuficiente.saldo_total)}
@@ -1066,12 +1067,12 @@ function AlertasPanel({
               />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Vencem em 60 Dias
               </p>
-              <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight mt-0.5">
                 {fmtNum(contratosVencendo.length)}
-                <span className="text-sm font-normal text-gray-500 ml-1.5">contratos</span>
+                <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-1.5">contratos</span>
               </p>
               <p className="text-xs text-red-500 font-semibold mt-1">Prazo de execução próximo</p>
             </div>
@@ -1094,14 +1095,14 @@ function AlertasPanel({
               <TrendingDown size={16} className={gargalo ? 'text-violet-600' : 'text-gray-400'} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Maior Gargalo
               </p>
               {gargalo ? (
                 <>
-                  <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight mt-0.5">
                     {fmtNum(gargalo.quantidade)}
-                    <span className="text-sm font-normal text-gray-500 ml-1.5">medições</span>
+                    <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-1.5">medições</span>
                   </p>
                   <p className="text-xs text-violet-600 font-semibold mt-0.5">{gargalo.etapa}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{brl(gargalo.valor)} represados</p>
@@ -1171,7 +1172,8 @@ function isCompetenciaAtrasada(value: string): boolean {
 function dimBarOption(
   items: DimItem[],
   color: string,
-  activeValue?: string[]
+  activeValue?: string[],
+  isDark?: boolean
 ): Record<string, unknown> {
   const top = items.slice(0, 12)
   const labels = top.map((d) => d.label)
@@ -1191,7 +1193,7 @@ function dimBarOption(
     yAxis: {
       type: 'category',
       data: [...labels].reverse(),
-      axisLabel: { fontSize: 11, width: 130, overflow: 'truncate' },
+      axisLabel: { fontSize: 11, width: 130, overflow: 'truncate', color: isDark ? '#9ca3af' : '#374151' },
     },
     series: [
       {
@@ -1215,13 +1217,16 @@ function dimBarOption(
           position: 'right',
           fontSize: 11,
           formatter: (p: { value: number }) => brl(p.value),
+          color: isDark ? '#d1d5db' : '#374151',
+          textBorderColor: 'transparent',
+          textBorderWidth: 0,
         },
       },
     ],
   }
 }
 
-function dimColumnOption(items: DimItem[]): Record<string, unknown> {
+function dimColumnOption(items: DimItem[], isDark?: boolean): Record<string, unknown> {
   const top = items.slice(0, 18)
   const data = top.map((item) => ({
     value: item.valor,
@@ -1246,13 +1251,13 @@ function dimColumnOption(items: DimItem[]): Record<string, unknown> {
     xAxis: {
       type: 'category',
       data: top.map((item) => item.label),
-      axisLabel: { fontSize: 10, interval: 0, rotate: 45, hideOverlap: true },
+      axisLabel: { fontSize: 10, interval: 0, rotate: 45, hideOverlap: true, color: isDark ? '#9ca3af' : '#374151' },
       axisTick: { alignWithLabel: true },
     },
     yAxis: {
       type: 'value',
       axisLabel: { show: false },
-      splitLine: { lineStyle: { color: '#E5E7EB' } },
+      splitLine: { lineStyle: { color: isDark ? '#374151' : '#E5E7EB' } },
     },
     series: [
       {
@@ -1264,6 +1269,9 @@ function dimColumnOption(items: DimItem[]): Record<string, unknown> {
           position: 'top',
           fontSize: 10,
           formatter: (p: { value: number }) => brl(Number(p.value)),
+          color: isDark ? '#d1d5db' : '#374151',
+          textBorderColor: 'transparent',
+          textBorderWidth: 0,
         },
       },
     ],
@@ -1289,11 +1297,15 @@ function DimChart({
   activeValue?: string[]
   chartType?: 'bar' | 'column'
 }) {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
   const height = Math.max(160, Math.min(items.length, 12) * 26 + 50)
   const option = useMemo(
     () =>
-      chartType === 'column' ? dimColumnOption(items) : dimBarOption(items, color, activeValue),
-    [chartType, items, color, activeValue]
+      chartType === 'column'
+        ? dimColumnOption(items, isDark)
+        : dimBarOption(items, color, activeValue, isDark),
+    [chartType, items, color, activeValue, isDark]
   )
   const events = useMemo(
     () =>
@@ -1308,10 +1320,10 @@ function DimChart({
           <div className="p-1.5 rounded-lg" style={{ backgroundColor: color + '18', color }}>
             {icon}
           </div>
-          <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">{title}</h3>
         </div>
         {activeValue && activeValue.length > 0 && (
-          <span className="text-xs text-gray-400 italic truncate max-w-[140px]">
+          <span className="text-xs text-gray-400 dark:text-gray-500 italic truncate max-w-[140px]">
             {activeValue.length === 1
               ? `filtro: ${activeValue[0]}`
               : `${activeValue.length} filtros`}
@@ -1342,9 +1354,11 @@ const PAGE_SIZE = 20
 
 function rowHighlight(row: FluxoRow): string {
   const isCritical = ETAPAS_CRITICAS.has(row.etapa_jornada)
-  if (isCritical && row.dias_na_etapa >= 30) return 'bg-red-50 hover:bg-red-100'
-  if (isCritical && row.dias_na_etapa >= 15) return 'bg-amber-50 hover:bg-amber-100'
-  return 'hover:bg-gray-50'
+  if (isCritical && row.dias_na_etapa >= 30)
+    return 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30'
+  if (isCritical && row.dias_na_etapa >= 15)
+    return 'bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30'
+  return 'hover:bg-gray-50 dark:hover:bg-gray-700'
 }
 
 function SortIcon({ col, sort }: { col: SortKey; sort: { key: SortKey | null; dir: SortDir } }) {
@@ -1413,7 +1427,7 @@ function FluxoTable({
   function ColHeader({ label, col }: { label: string; col: SortKey }) {
     return (
       <th
-        className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none whitespace-nowrap"
+        className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 select-none whitespace-nowrap"
         onClick={() => toggleSort(col)}
       >
         <span className="flex items-center gap-0.5">
@@ -1437,7 +1451,7 @@ function FluxoTable({
               setPage(1)
             }}
             placeholder="Filtrar por empresa, contrato ou rodovia..."
-            className="w-full pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white"
+            className="w-full pl-8 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-400 bg-white dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-500"
           />
           {localSearch && (
             <button
@@ -1457,26 +1471,26 @@ function FluxoTable({
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
             <tr>
               <ColHeader label="Empresa" col="empresa" />
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Rodovia
               </th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Contrato / Med.
               </th>
               <ColHeader label="Competência" col="mes_ano" />
               <ColHeader label="Valor" col="vlevento" />
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Etapa
               </th>
               <ColHeader label="Dias" col="dias_na_etapa" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {pageData.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-3 py-10 text-center text-sm text-gray-400">
@@ -1492,7 +1506,7 @@ function FluxoTable({
                 >
                   <td className="px-3 py-2.5 max-w-[180px]">
                     <span
-                      className="block truncate text-sm font-medium text-gray-800"
+                      className="block truncate text-sm font-medium text-gray-800 dark:text-gray-200"
                       title={row.empresa}
                     >
                       {row.empresa || '—'}
@@ -1501,19 +1515,19 @@ function FluxoTable({
                       <span className="text-xs text-gray-400">{row.tipo_contrato}</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">
+                  <td className="px-3 py-2.5 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                     {row.rodovias || '—'}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap">
-                    <span className="font-mono text-xs font-semibold text-gray-700">
+                    <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-300">
                       {row.contrato}
                     </span>
-                    <span className="text-xs text-gray-400 ml-1">#{row.num_medicao}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">#{row.num_medicao}</span>
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">
+                  <td className="px-3 py-2.5 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                     {row.mes_ano || '—'}
                   </td>
-                  <td className="px-3 py-2.5 text-sm font-semibold text-gray-800 whitespace-nowrap text-right">
+                  <td className="px-3 py-2.5 text-sm font-semibold text-gray-800 dark:text-gray-200 whitespace-nowrap text-right">
                     {brlFull(row.vlevento)}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{etapaBadge(row.etapa_jornada)}</td>
@@ -1536,14 +1550,14 @@ function FluxoTable({
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
+              className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-300 transition-colors"
             >
               Anterior
             </button>
             <button
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
+              className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-300 transition-colors"
             >
               Próxima
             </button>
@@ -1611,7 +1625,7 @@ function FilterBar({
       <div className="flex items-center justify-between md:hidden">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900"
+          className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100"
         >
           <SlidersHorizontal size={15} className="text-gray-500" />
           Filtros
@@ -1693,7 +1707,7 @@ function FilterBar({
         </div>
         <div className="flex gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
               Competência de
             </p>
             <MonthPicker value={competenciaDe} onChange={onCompetenciaDe} placeholder="Início" />
@@ -1709,7 +1723,7 @@ function FilterBar({
           {activeCount > 0 && (
             <button
               onClick={onLimpar}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             >
               <X size={12} />
               Limpar filtros
@@ -1721,7 +1735,7 @@ function FilterBar({
           <button
             onClick={onHelp}
             title="Ajuda sobre esta tela"
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-blue-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 hover:text-blue-600 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 transition-colors"
           >
             <HelpCircle size={13} />
             Ajuda
@@ -1741,26 +1755,26 @@ function HelpModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] overflow-y-auto mx-4 flex flex-col"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] overflow-y-auto mx-4 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 rounded-t-2xl z-10">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-blue-100 rounded-lg">
-              <HelpCircle size={16} className="text-blue-600" />
+            <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <HelpCircle size={16} className="text-blue-600 dark:text-blue-400" />
             </div>
-            <h2 className="text-base font-semibold text-gray-800">
+            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">
               Rastreio de Pagamentos — Guia da tela
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <X size={18} />
           </button>
         </div>
-        <div className="px-6 py-5 space-y-6 text-sm text-gray-600">
+        <div className="px-6 py-5 space-y-6 text-sm text-gray-600 dark:text-gray-400">
           <p className="text-gray-500 leading-relaxed">
             Esta tela acompanha o ciclo financeiro de cada medição — desde a aprovação pelo DER-PE
             até o pagamento à empresa contratada. Use os filtros para focar em empresa, rodovia ou
@@ -1768,7 +1782,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </p>
 
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
               Indicadores (KPIs)
             </h3>
             <div className="space-y-3">
@@ -1797,8 +1811,8 @@ function HelpModal({ onClose }: { onClose: () => void }) {
                 <div key={title} className="flex gap-3">
                   <span className={`mt-0.5 w-2 h-2 rounded-full ${color} flex-shrink-0`} />
                   <div>
-                    <p className="font-semibold text-gray-700">{title}</p>
-                    <p className="text-gray-500 leading-relaxed">{desc}</p>
+                    <p className="font-semibold text-gray-700 dark:text-gray-300">{title}</p>
+                    <p className="text-gray-500 dark:text-gray-400 leading-relaxed">{desc}</p>
                   </div>
                 </div>
               ))}
@@ -1806,7 +1820,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
               Jornada Completa das Medições
             </h3>
             <p className="text-gray-500 leading-relaxed mb-2">
@@ -1831,8 +1845,8 @@ function HelpModal({ onClose }: { onClose: () => void }) {
                 ['Paga Integr.', 'Pagamento 100% concluído. Medição encerrada.'],
               ].map(([etapa, desc]) => (
                 <li key={etapa} className="flex gap-2">
-                  <span className="font-semibold text-gray-700 whitespace-nowrap">{etapa}:</span>
-                  <span className="text-gray-500">{desc}</span>
+                  <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">{etapa}:</span>
+                  <span className="text-gray-500 dark:text-gray-400">{desc}</span>
                 </li>
               ))}
             </ol>
@@ -1842,7 +1856,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
               Atenção Imediata
             </h3>
             <div className="space-y-2.5">
@@ -1875,7 +1889,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
               Tabela de Rastreio
             </h3>
             <p className="text-gray-500 leading-relaxed mb-2">
@@ -1999,23 +2013,23 @@ function AderenciaCronograma({ rows }: { rows: FluxoRow[] }) {
 
       <div className="card overflow-hidden">
         <div className="mb-4">
-          <h3 className="text-sm font-semibold text-gray-700">Aderência ao Cronograma</h3>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Aderência ao Cronograma</h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
             Etapa esperada hoje vs etapa real de cada medição, por competência.
           </p>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Competência
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Esperado hoje
                 </th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Total
                 </th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold text-red-500 uppercase tracking-wider">
@@ -2032,7 +2046,7 @@ function AderenciaCronograma({ rows }: { rows: FluxoRow[] }) {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {stats.map((s) => {
                 if (!s) return null
                 const aderencia =
@@ -2042,8 +2056,8 @@ function AderenciaCronograma({ rows }: { rows: FluxoRow[] }) {
                 const stageColor = s.stage ? (ETAPA_COLORS[s.stage] ?? '#9CA3AF') : null
 
                 return (
-                  <tr key={s.compStr} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-semibold text-gray-700 text-xs whitespace-nowrap">
+                  <tr key={s.compStr} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300 text-xs whitespace-nowrap">
                       {s.compStr}
                     </td>
                     <td className="px-4 py-3">
@@ -2064,7 +2078,7 @@ function AderenciaCronograma({ rows }: { rows: FluxoRow[] }) {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-700 text-xs">
+                    <td className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300 text-xs">
                       {fmtNum(s.total)}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -2118,18 +2132,18 @@ function AderenciaCronograma({ rows }: { rows: FluxoRow[] }) {
           </table>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-400 space-y-0.5">
+        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500 space-y-0.5">
           <p>
-            <span className="font-semibold text-gray-500">Esperado hoje:</span> etapa configurada no
+            <span className="font-semibold text-gray-500 dark:text-gray-400">Esperado hoje:</span> etapa configurada no
             Cronograma para o dia atual no período da competência.
           </p>
           <p>
-            <span className="font-semibold text-gray-500">Atrasada:</span> etapa real anterior à
-            esperada. <span className="font-semibold text-gray-500">Adiantada:</span> etapa real
+            <span className="font-semibold text-gray-500 dark:text-gray-400">Atrasada:</span> etapa real anterior à
+            esperada. <span className="font-semibold text-gray-500 dark:text-gray-400">Adiantada:</span> etapa real
             posterior à esperada.
           </p>
           <p>
-            <span className="font-semibold text-gray-500">Aderência:</span> (No prazo + Adiantadas)
+            <span className="font-semibold text-gray-500 dark:text-gray-400">Aderência:</span> (No prazo + Adiantadas)
             ÷ Total.
           </p>
         </div>
@@ -2495,7 +2509,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
           onHelp={() => setShowHelp(true)}
         />
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-100 p-1.5 inline-flex flex-wrap gap-1.5 w-full md:w-auto shadow-sm">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1.5 inline-flex flex-wrap gap-1.5 w-full md:w-auto shadow-sm">
           {[
             { id: 'resumo', label: 'Resumo' },
             { id: 'analitico', label: 'Análise' },
@@ -2511,8 +2525,8 @@ export function FluxoMedicoes({ data: rawData }: Props) {
               }}
               className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all ${
                 activePage === tab.id
-                  ? 'bg-white text-blue-700 shadow-sm ring-1 ring-blue-100'
-                  : 'text-slate-600 hover:text-slate-800 hover:bg-white/60'
+                  ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-400 shadow-sm ring-1 ring-blue-100 dark:ring-blue-900'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/60 dark:hover:bg-white/10'
               }`}
             >
               {tab.label}
@@ -2572,10 +2586,10 @@ export function FluxoMedicoes({ data: rawData }: Props) {
             <div className="card">
               <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-700">
+                  <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                     Jornada Completa das Medições
                   </h2>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                     Clique em uma etapa para filtrar a tabela
                     {etapaFiltro && (
                       <button
@@ -2602,7 +2616,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
             </div>
 
             <div>
-              <h2 className="text-sm font-semibold text-gray-700 mb-3">Atenção Imediata</h2>
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Atenção Imediata</h2>
               <AlertasPanel
                 data={filteredBase}
                 allData={rows}
@@ -2615,8 +2629,8 @@ export function FluxoMedicoes({ data: rawData }: Props) {
         {activePage === 'analitico' && (
           <div className="card space-y-5">
             <div className="mb-4">
-              <h2 className="text-base font-bold text-gray-800">Medições em aberto</h2>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">Medições em aberto</h2>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                 Medições já fechadas e não pagas · clique nos gráficos para filtrar a tabela
               </p>
             </div>

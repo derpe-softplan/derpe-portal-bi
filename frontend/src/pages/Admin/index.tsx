@@ -139,7 +139,7 @@ function UsersTab() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">Usuários</h2>
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Usuários</h2>
         <button
           className="btn-primary flex items-center gap-1.5 text-sm"
           onClick={() => { setShowForm(!showForm); setEditingId(null) }}
@@ -198,25 +198,25 @@ function UsersTab() {
 
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
             <tr>
               {['Nome', 'Usuário', 'E-mail', 'Perfil', 'Ativo', ''].map((h) => (
                 <th
                   key={h}
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase"
+                  className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase"
                 >
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {users.map((u) => (
               <React.Fragment key={u.id}>
-                <tr className={clsx('hover:bg-gray-50', editingId === u.id && 'bg-blue-50')}>
-                  <td className="px-4 py-3 font-medium text-gray-800">{u.full_name}</td>
-                  <td className="px-4 py-3 text-gray-600 font-mono text-xs">{u.username ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{u.email ?? '—'}</td>
+                <tr className={clsx('hover:bg-gray-50 dark:hover:bg-gray-700/30', editingId === u.id && 'bg-blue-50 dark:bg-blue-900/20')}>
+                  <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{u.full_name}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 font-mono text-xs">{u.username ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{u.email ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span
                       className={clsx(
@@ -269,10 +269,10 @@ function UsersTab() {
 
                 {editingId === u.id && (
                   <tr>
-                    <td colSpan={6} className="bg-blue-50 px-4 pb-4 border-b border-blue-100">
+                    <td colSpan={6} className="bg-blue-50 dark:bg-blue-900/20 px-4 pb-4 border-b border-blue-100 dark:border-blue-800">
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
                         <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Nome completo</label>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Nome completo</label>
                           <input
                             className="input"
                             value={editForm.full_name}
@@ -280,7 +280,7 @@ function UsersTab() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Usuário (login)</label>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Usuário (login)</label>
                           <input
                             className="input font-mono"
                             value={editForm.username}
@@ -288,7 +288,7 @@ function UsersTab() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">E-mail (opcional)</label>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">E-mail (opcional)</label>
                           <input
                             className="input"
                             type="email"
@@ -297,7 +297,7 @@ function UsersTab() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Perfil</label>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Perfil</label>
                           <select
                             className="input"
                             value={editForm.role}
@@ -309,7 +309,7 @@ function UsersTab() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Nova senha (deixe em branco para manter)</label>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Nova senha (deixe em branco para manter)</label>
                           <input
                             className="input"
                             type="password"
@@ -406,12 +406,12 @@ function ScheduleModal({
       className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-start justify-between gap-3">
           <div>
-            <h3 className="font-semibold text-gray-900">Agendar atualização</h3>
-            <p className="text-xs text-gray-500 mt-0.5">{report.title}</p>
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Agendar atualização</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{report.title}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 mt-0.5">
             <X size={18} />
@@ -421,7 +421,7 @@ function ScheduleModal({
         <div className="px-6 py-5 space-y-5">
           {/* Frequência */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
               Frequência
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -929,7 +929,7 @@ function ReportsTab() {
       )}
 
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">Relatórios</h2>
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Relatórios</h2>
         <button
           className="btn-primary flex items-center gap-1.5 text-sm"
           onClick={() => setShowForm(!showForm)}
@@ -993,8 +993,8 @@ function ReportsTab() {
         <div className="card p-5 mb-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-semibold text-gray-800">Configuração do relatório</h3>
-              <p className="text-xs text-gray-500">Ajuste a capa, a descrição e os acessos</p>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-gray-200">Configuração do relatório</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Ajuste a capa, a descrição e os acessos</p>
             </div>
             <button className="btn-secondary text-xs" onClick={() => setEditingId(null)}>
               Fechar
@@ -1015,8 +1015,8 @@ function ReportsTab() {
                 value={editingForm.slug}
                 onChange={(e) => setEditingForm((f) => ({ ...f, slug: e.target.value }))}
               />
-              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-3">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+              <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/40 p-3">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
                   Imagem de capa
                 </label>
                 <input
@@ -1044,7 +1044,7 @@ function ReportsTab() {
 
             <div className="space-y-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
                   Sistemas
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -1053,7 +1053,7 @@ function ReportsTab() {
                       'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer text-sm font-medium transition-colors',
                       editingForm.sistemas.includes(s)
                         ? 'bg-gov-blue text-white border-gov-blue'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-gov-blue'
+                        : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-gov-blue'
                     )}>
                       <input
                         type="checkbox"
@@ -1073,7 +1073,7 @@ function ReportsTab() {
               </div>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
                   Tipo de relatório
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -1082,7 +1082,7 @@ function ReportsTab() {
                       'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer text-sm font-medium transition-colors',
                       editingForm.tipos.includes(t)
                         ? 'bg-gov-blue text-white border-gov-blue'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-gov-blue'
+                        : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-gov-blue'
                     )}>
                       <input
                         type="checkbox"
@@ -1102,12 +1102,12 @@ function ReportsTab() {
               </div>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
                   Perfis com acesso
                 </p>
                 <div className="space-y-2 max-h-40 overflow-auto pr-1">
                   {groups.map((group) => (
-                    <label key={group.id} className="flex items-center gap-2 text-sm text-gray-700">
+                    <label key={group.id} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                       <input
                         type="checkbox"
                         checked={selectedGroupIds.includes(group.id)}
@@ -1126,12 +1126,12 @@ function ReportsTab() {
               </div>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
                   Usuários com acesso
                 </p>
                 <div className="space-y-2 max-h-40 overflow-auto pr-1">
                   {users.map((user) => (
-                    <label key={user.id} className="flex items-center gap-2 text-sm text-gray-700">
+                    <label key={user.id} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                       <input
                         type="checkbox"
                         checked={selectedUserIds.includes(user.id)}
@@ -1161,27 +1161,27 @@ function ReportsTab() {
 
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
             <tr>
               {['Título', 'Status', 'Última atualização', 'Próximo refresh', ''].map((h) => (
                 <th
                   key={h}
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase"
+                  className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase"
                 >
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {reports.map((r: ReportAdmin) => (
               <React.Fragment key={r.id}>
-                <tr className="hover:bg-gray-50">
+                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                   <td
                     className="px-4 py-3 cursor-pointer"
                     onClick={() => navigate(`/relatorio/${r.slug}`)}
                   >
-                    <p className="font-medium text-gray-800 hover:text-gov-blue transition-colors">
+                    <p className="font-medium text-gray-800 dark:text-gray-200 hover:text-gov-blue transition-colors">
                       {r.title}
                     </p>
                     <p className="text-xs text-gray-400 font-mono mt-0.5">{r.slug}</p>
@@ -1359,7 +1359,7 @@ function GroupsTab() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">Grupos</h2>
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Grupos</h2>
         <button
           className="btn-primary flex items-center gap-1.5 text-sm"
           onClick={() => setShowForm(!showForm)}
@@ -1393,18 +1393,18 @@ function GroupsTab() {
         </div>
       )}
 
-      <div className="card overflow-hidden divide-y divide-gray-100">
+      <div className="card overflow-hidden divide-y divide-gray-100 dark:divide-gray-700">
         {groups.length === 0 && (
           <p className="p-8 text-center text-gray-400 text-sm">Nenhum grupo cadastrado.</p>
         )}
         {groups.map((group) => (
           <div key={group.id}>
             <div
-              className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer"
+              className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer"
               onClick={() => setExpandedId(expandedId === group.id ? null : group.id)}
             >
               <div>
-                <p className="font-medium text-gray-800">{group.name}</p>
+                <p className="font-medium text-gray-800 dark:text-gray-200">{group.name}</p>
                 {group.description && (
                   <p className="text-xs text-gray-400 mt-0.5">{group.description}</p>
                 )}
@@ -1428,7 +1428,7 @@ function GroupsTab() {
             </div>
 
             {expandedId === group.id && (
-              <div className="px-4 pb-4 bg-gray-50 border-t border-gray-100">
+              <div className="px-4 pb-4 bg-gray-50 dark:bg-gray-900/40 border-t border-gray-100 dark:border-gray-700">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mt-3 mb-2">
                   Membros
                 </p>
@@ -1438,7 +1438,7 @@ function GroupsTab() {
                     return (
                       <label
                         key={user.id}
-                        className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"
+                        className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
                       >
                         <input
                           type="checkbox"
@@ -1486,13 +1486,13 @@ export default function Admin() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Administração</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Administração</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           Gerencie usuários, grupos e relatórios do portal
         </p>
       </div>
 
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-gray-700">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -1501,7 +1501,7 @@ export default function Admin() {
               'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
               tab === t.key
                 ? 'border-gov-blue text-gov-blue'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
             )}
           >
             {t.icon}
