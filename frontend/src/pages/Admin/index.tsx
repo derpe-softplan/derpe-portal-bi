@@ -25,6 +25,12 @@ import {
   Pencil,
   ToggleLeft,
   ToggleRight,
+  Settings,
+  Archive,
+  Globe,
+  Send,
+  RotateCcw,
+  ScrollText,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -1236,67 +1242,68 @@ function ReportsTab() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-3">
+                    <div className="flex items-center justify-end gap-1">
                       <button
-                        className="text-xs text-gov-blue hover:text-gov-blue-dark transition-colors"
+                        className="p-1.5 rounded-lg text-gov-blue hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
                         onClick={() => openEditor(r)}
+                        title="Configurar"
                       >
-                        Configurar
+                        <Settings size={15} />
                       </button>
 
                       <button
-                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition-colors border-l pl-3"
+                        className="p-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
                         onClick={() => setSchedulingReport(r)}
-                        title={
-                          r.refresh_schedule ? `Agendado: ${r.refresh_schedule}` : 'Sem agendamento'
-                        }
+                        title={r.refresh_schedule ? `Agendado: ${r.refresh_schedule}` : 'Agendar atualização'}
                       >
                         <CalendarClock
-                          size={13}
-                          className={r.refresh_schedule ? 'text-blue-400' : 'text-gray-300'}
+                          size={15}
+                          className={r.refresh_schedule ? 'text-blue-400' : 'text-gray-400'}
                         />
-                        Agendar
                       </button>
 
                       <button
                         className={clsx(
-                          'flex items-center gap-1 text-xs font-medium transition-colors',
+                          'p-1.5 rounded-lg transition-colors',
                           refreshingId === r.id
                             ? 'text-gray-400 cursor-wait'
-                            : 'text-gov-blue hover:text-gov-blue-dark'
+                            : 'text-gov-blue hover:bg-blue-50 dark:hover:bg-blue-900/30'
                         )}
                         onClick={() => refreshReport(r.id)}
                         disabled={refreshingId === r.id}
-                        title="Buscar dados do DW agora"
+                        title={refreshingId === r.id ? 'Importando...' : 'Atualizar dados agora'}
                       >
                         <RefreshCw
-                          size={13}
+                          size={15}
                           className={refreshingId === r.id ? 'animate-spin' : ''}
                         />
-                        {refreshingId === r.id ? 'Importando...' : 'Atualizar dados'}
                       </button>
 
                       <button
                         className={clsx(
-                          'flex items-center gap-1 text-xs transition-colors border-l pl-3',
+                          'p-1.5 rounded-lg transition-colors',
                           logsOpenId === r.id
-                            ? 'text-gray-700 font-medium'
-                            : 'text-gray-400 hover:text-gray-600'
+                            ? 'text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700'
+                            : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                         )}
                         onClick={() => setLogsOpenId(logsOpenId === r.id ? null : r.id)}
+                        title="Ver logs"
                       >
-                        {logsOpenId === r.id ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                        Logs
+                        <ScrollText size={15} />
                       </button>
 
                       {nextStatus[r.status] && (
                         <button
-                          className="text-xs text-gray-500 hover:text-gray-800 transition-colors border-l pl-3"
+                          className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                           onClick={() =>
                             setStatus.mutate({ id: r.id, status: nextStatus[r.status]! })
                           }
+                          title={nextLabel[r.status]}
                         >
-                          {nextLabel[r.status]}
+                          {r.status === 'draft' && <Send size={15} />}
+                          {r.status === 'in_review' && <Globe size={15} className="text-green-500" />}
+                          {r.status === 'published' && <Archive size={15} />}
+                          {r.status === 'archived' && <RotateCcw size={15} className="text-blue-400" />}
                         </button>
                       )}
                     </div>
