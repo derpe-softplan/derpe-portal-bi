@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
+import ConfirmModal from '../../components/ConfirmModal'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -147,10 +148,24 @@ function UsersTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   })
 
+  const [confirm, setConfirm] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null)
+  const closeConfirm = useCallback(() => setConfirm(null), [])
+
   if (isLoading) return <Spinner />
 
   return (
     <div>
+      {confirm && (
+        <ConfirmModal
+          title={confirm.title}
+          message={confirm.message}
+          confirmLabel="Confirmar"
+          variant="warning"
+          onConfirm={() => { confirm.onConfirm(); closeConfirm() }}
+          onCancel={closeConfirm}
+        />
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Usuários</h2>
         <button
@@ -268,10 +283,11 @@ function UsersTab() {
                       <button
                         title="Resetar senha (usuário definirá nova senha no próximo acesso)"
                         className="p-1.5 rounded-lg transition-colors text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30"
-                        onClick={() => {
-                          if (window.confirm(`Resetar a senha de "${u.full_name}"?\n\nA senha será redefinida para derpe123 e o usuário precisará trocá-la no próximo acesso.`))
-                            resetPassword.mutate(u.id)
-                        }}
+                        onClick={() => setConfirm({
+                          title: 'Resetar senha',
+                          message: `A senha de "${u.full_name}" será redefinida para derpe123. O usuário precisará trocá-la no próximo acesso.`,
+                          onConfirm: () => resetPassword.mutate(u.id),
+                        })}
                       >
                         <KeyRound size={14} />
                       </button>

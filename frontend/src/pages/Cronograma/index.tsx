@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, Info, Loader2, Wand2 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { cronogramaApi } from '../../services/api'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
+import ConfirmModal from '../../components/ConfirmModal'
 
 // ── Etapas ────────────────────────────────────────────────────────────────────
 
@@ -177,6 +178,8 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
   const anoAtual = new Date().getFullYear()
   const [ano, setAno] = useState(anoAtual)
   const [activeStage, setActiveStage] = useState<string | null>(ETAPAS[0].key)
+  const [confirm, setConfirm] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null)
+  const closeConfirm = useCallback(() => setConfirm(null), [])
   const [modelo, setModelo] = useState<ModeloItem[]>(loadModelo)
   const [configs, setConfigs] = useState<Record<string, Record<number, string>>>({})
 
@@ -264,12 +267,14 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
   }
 
   function preencherAno() {
-    if (
-      !window.confirm(
-        `Isso vai preencher automaticamente todos os meses de ${ano} com base no modelo de dias úteis. Configurações existentes serão substituídas. Continuar?`
-      )
-    )
-      return
+    setConfirm({
+      title: `Preencher ${ano} automaticamente`,
+      message: `Todos os meses de ${ano} serão preenchidos com base no modelo de dias úteis. Configurações existentes serão substituídas.`,
+      onConfirm: executarPreenchimento,
+    })
+  }
+
+  function executarPreenchimento() {
     for (let m = 1; m <= 12; m++) {
       const sched = nextMonth(ano, m)
       const filled = autoFill(sched.year, sched.month, modelo)
@@ -284,6 +289,17 @@ export default function Cronograma({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="space-y-4">
+      {confirm && (
+        <ConfirmModal
+          title={confirm.title}
+          message={confirm.message}
+          confirmLabel="Preencher"
+          variant="warning"
+          onConfirm={() => { confirm.onConfirm(); closeConfirm() }}
+          onCancel={closeConfirm}
+        />
+      )}
+
       {/* Cabeçalho */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         {!compact && (
