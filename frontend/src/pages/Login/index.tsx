@@ -31,10 +31,8 @@ export default function Login() {
     <div className="min-h-screen flex">
       {/* ── Painel esquerdo ─────────────────────────────────────────────── */}
       <div className="hidden lg:flex lg:w-3/5 relative overflow-hidden">
-        {/* Gradient base */}
         <div className="absolute inset-0 bg-gradient-to-br from-gov-blue-dark via-gov-blue to-[#0069C2]" />
 
-        {/* Subtle road grid pattern */}
         <svg
           className="absolute inset-0 w-full h-full opacity-[0.07]"
           xmlns="http://www.w3.org/2000/svg"
@@ -47,33 +45,15 @@ export default function Login() {
           <rect width="100%" height="100%" fill="url(#grid)" />
         </svg>
 
-        {/* Decorative road lines */}
         <svg
           className="absolute inset-0 w-full h-full opacity-10"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <line
-            x1="0"
-            y1="70%"
-            x2="100%"
-            y2="55%"
-            stroke="white"
-            strokeWidth="3"
-            strokeDasharray="20 12"
-          />
+          <line x1="0" y1="70%" x2="100%" y2="55%" stroke="white" strokeWidth="3" strokeDasharray="20 12" />
           <line x1="0" y1="73%" x2="100%" y2="58%" stroke="white" strokeWidth="1" />
-          <line
-            x1="0"
-            y1="40%"
-            x2="60%"
-            y2="80%"
-            stroke="white"
-            strokeWidth="2"
-            strokeDasharray="20 12"
-          />
+          <line x1="0" y1="40%" x2="60%" y2="80%" stroke="white" strokeWidth="2" strokeDasharray="20 12" />
         </svg>
 
-        {/* Yellow accent bar */}
         <div className="absolute top-0 left-0 w-1.5 h-full bg-gov-yellow" />
 
         <div className="relative z-10 flex flex-col justify-between p-14 text-white w-full">
@@ -121,7 +101,6 @@ export default function Login() {
         </button>
 
         <div className="max-w-sm w-full mx-auto">
-          {/* Logo mobile */}
           <div className="flex items-center gap-2 mb-10 lg:mb-8">
             <div className="w-8 h-8 bg-gov-blue rounded flex items-center justify-center lg:hidden">
               <div className="w-4 h-4 border-2 border-white rounded-sm" />

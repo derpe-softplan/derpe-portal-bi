@@ -53,7 +53,7 @@ class UserCreate(BaseModel):
     username: str
     email: str | None = None
     full_name: str
-    password: str
+    password: str | None = None
     role: UserRole = UserRole.viewer
 
 
@@ -100,7 +100,7 @@ async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db), _=De
         username=username,
         email=body.email,
         full_name=body.full_name,
-        hashed_password=hash_password(body.password),
+        hashed_password=hash_password(body.password if body.password else 'derpe123'),
         role=body.role,
         must_change_password=True,
     )
@@ -133,6 +133,18 @@ async def update_user(user_id: int, body: UserUpdate, db: AsyncSession = Depends
     await db.commit()
     await db.refresh(user)
     return user
+
+
+@router.post("/users/{user_id}/reset-password", status_code=200)
+async def reset_user_password(user_id: int, db: AsyncSession = Depends(get_db), _=Depends(require_admin)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "Usuário não encontrado")
+    user.hashed_password = hash_password('derpe123')
+    user.must_change_password = True
+    await db.commit()
+    return {"ok": True}
 
 
 # ── Groups ────────────────────────────────────────────────────────────────────

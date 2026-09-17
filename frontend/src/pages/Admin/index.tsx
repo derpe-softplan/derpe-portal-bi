@@ -31,6 +31,7 @@ import {
   Send,
   RotateCcw,
   ScrollText,
+  KeyRound,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -138,6 +139,11 @@ function UsersTab() {
 
   const toggleActive = useMutation({
     mutationFn: (u: UserAdmin) => adminApi.users.update(u.id, { is_active: !u.is_active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+  })
+
+  const resetPassword = useMutation({
+    mutationFn: (id: number) => adminApi.users.resetPassword(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   })
 
@@ -260,8 +266,18 @@ function UsersTab() {
                         <Pencil size={14} />
                       </button>
                       <button
+                        title="Resetar senha (usuário definirá nova senha no próximo acesso)"
+                        className="p-1.5 rounded-lg transition-colors text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30"
+                        onClick={() => {
+                          if (window.confirm(`Resetar a senha de "${u.full_name}"?\n\nA senha será redefinida para derpe123 e o usuário precisará trocá-la no próximo acesso.`))
+                            resetPassword.mutate(u.id)
+                        }}
+                      >
+                        <KeyRound size={14} />
+                      </button>
+                      <button
                         title={u.is_active ? 'Desativar usuário' : 'Ativar usuário'}
-                        className="p-1.5 rounded-lg transition-colors hover:bg-gray-100"
+                        className="p-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
                         onClick={() => toggleActive.mutate(u)}
                       >
                         {u.is_active ? (

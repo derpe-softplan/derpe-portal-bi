@@ -73,6 +73,7 @@ export const adminApi = {
     list: () => api.get<UserAdmin[]>('/admin/users'),
     create: (d: UserCreate) => api.post<UserAdmin>('/admin/users', d),
     update: (id: number, d: UserUpdate) => api.put<UserAdmin>(`/admin/users/${id}`, d),
+    resetPassword: (id: number) => api.post(`/admin/users/${id}/reset-password`),
   },
   groups: {
     list: () => api.get<Group[]>('/admin/groups'),
@@ -130,7 +131,7 @@ export interface UserCreate {
   username: string
   email?: string
   full_name: string
-  password: string
+  password?: string
   role: string
 }
 
