@@ -28,9 +28,15 @@ class Settings(BaseSettings):
     admin_username: str = "admin"
     admin_password: str
 
-    resend_api_key: str = ""
-    email_from: str = "noreply@tacticus.com.br"
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
     email_from_name: str = "DER-PE Portal BI"
+
+    @property
+    def email_from(self) -> str:
+        return self.smtp_user
 
     @property
     def database_url(self) -> str:
