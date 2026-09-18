@@ -11,7 +11,6 @@ from sqlalchemy.orm import selectinload
 
 from app.auth.deps import require_admin, require_cronograma_editor, require_publisher
 from app.auth.service import hash_password
-from app.email import send_account_created_email, send_password_reset_email
 from app.db.models import (
     Group,
     RefreshLog,
@@ -24,6 +23,7 @@ from app.db.models import (
     UserRole,
 )
 from app.db.session import get_db
+from app.email import send_account_created_email, send_password_reset_email
 from app.reports.refresh import run_refresh, scheduler
 
 router = APIRouter()
@@ -140,7 +140,7 @@ async def update_user(user_id: int, body: UserUpdate, db: AsyncSession = Depends
 
 @router.post("/test-email", status_code=200)
 async def test_email(to: str, _=Depends(require_admin)):
-    from app.email import send_email, _base_template
+    from app.email import _base_template, send_email
     ok = await send_email(
         to,
         "Teste de email — DER-PE Portal BI",
