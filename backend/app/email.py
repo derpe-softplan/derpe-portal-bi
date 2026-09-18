@@ -1,39 +1,38 @@
 import logging
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 
-import aiosmtplib
+import httpx
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+RESEND_URL = "https://api.resend.com/emails"
+
 
 async def send_email(to: str, subject: str, html: str) -> bool:
-    if not settings.smtp_user or not settings.smtp_password:
-        logger.warning("SMTP não configurado — email não enviado para %s", to)
+    if not settings.resend_api_key:
+        logger.warning("RESEND_API_KEY não configurado — email não enviado para %s", to)
         return False
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"{settings.email_from_name} <{settings.smtp_user}>"
-    msg["To"] = to
-    msg.attach(MIMEText(html, "html", "utf-8"))
+    sender = f"{settings.email_from_name} <{settings.email_from}>"
 
-    try:
-        await aiosmtplib.send(
-            msg,
-            hostname=settings.smtp_host,
-            port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_password,
-            start_tls=True,
-        )
-        logger.info("Email enviado para %s", to)
-        return True
-    except Exception as e:
-        logger.error("Falha ao enviar email para %s: %s", to, e)
-        return False
+    async with httpx.AsyncClient() as client:
+        try:
+            r = await client.post(
+                RESEND_URL,
+                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+                json={"from": sender, "to": [to], "subject": subject, "html": html},
+                timeout=10,
+            )
+            r.raise_for_status()
+            logger.info("Email enviado para %s", to)
+            return True
+        except httpx.HTTPStatusError as e:
+            logger.error("Falha ao enviar email para %s: %s — %s", to, e.response.status_code, e.response.text)
+            return False
+        except Exception as e:
+            logger.error("Erro inesperado ao enviar email para %s: %s", to, e)
+            return False
 
 
 def _base_template(content: str) -> str:
@@ -122,7 +121,7 @@ async def send_account_created_email(to: str, full_name: str, username: str) -> 
         </tr>
       </table>
       <p style="margin:0 0 24px;font-size:14px;color:#6b7280;line-height:1.6;">
-        No primeiro acesso você será solicitado a criar uma senha pessoal.
+        No primeiro acesso você será solicitado a criar uma nova senha pessoal.
       </p>
       <p style="margin:0;font-size:13px;color:#9ca3af;">
         Se você não esperava esta mensagem, ignore-o ou entre em contato com o administrador.
