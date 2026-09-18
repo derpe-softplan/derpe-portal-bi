@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.auth.deps import require_admin, require_cronograma_editor, require_publisher
 from app.auth.service import hash_password
+from app.email import send_account_created_email, send_password_reset_email
 from app.db.models import (
     Group,
     RefreshLog,
@@ -107,6 +108,8 @@ async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db), _=De
     db.add(user)
     await db.commit()
     await db.refresh(user)
+    if user.email:
+        await send_account_created_email(user.email, user.full_name, user.username or username)
     return user
 
 
@@ -135,6 +138,17 @@ async def update_user(user_id: int, body: UserUpdate, db: AsyncSession = Depends
     return user
 
 
+@router.post("/test-email", status_code=200)
+async def test_email(to: str, _=Depends(require_admin)):
+    from app.email import send_email, _base_template
+    ok = await send_email(
+        to,
+        "Teste de email — DER-PE Portal BI",
+        _base_template("<p style='font-size:15px;color:#374151;'>Email de teste enviado com sucesso!</p>"),
+    )
+    return {"ok": ok}
+
+
 @router.post("/users/{user_id}/reset-password", status_code=200)
 async def reset_user_password(user_id: int, db: AsyncSession = Depends(get_db), _=Depends(require_admin)):
     result = await db.execute(select(User).where(User.id == user_id))
@@ -144,6 +158,8 @@ async def reset_user_password(user_id: int, db: AsyncSession = Depends(get_db), 
     user.hashed_password = hash_password('derpe123')
     user.must_change_password = True
     await db.commit()
+    if user.email:
+        await send_password_reset_email(user.email, user.full_name)
     return {"ok": True}
 
 
