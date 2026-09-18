@@ -123,13 +123,25 @@ pagamento_agg AS (
     GROUP BY skmedicao
 ),
 empresas AS (
-    SELECT
-        sc.skcontrato,
-        STRING_AGG(DISTINCT su.nmsujeito, '; ' ORDER BY su.nmsujeito) AS empresas
-    FROM siderdwh.ebisfsujeitocontrato sc
-    JOIN siderdwh.ebisdsujeito su ON su.sksujeito = sc.sksujeito
-    WHERE sc.flactive = 'S'
-    GROUP BY sc.skcontrato
+SELECT
+    sc.skcontrato,
+    STRING_AGG(
+        DISTINCT COALESCE(su.nmfantasia, su.nmsujeito),
+        '; '
+        ORDER BY COALESCE(su.nmfantasia, su.nmsujeito)
+    ) AS empresas
+FROM siderdwh.ebisfsujeitocontrato sc
+JOIN siderdwh.ebisdsujeito su
+    ON su.sksujeito = sc.sksujeito
+GROUP BY sc.skcontrato
+),
+tipo_contrato as (
+	select 
+	skcontrato,
+	ai.deagregadoritem
+	from siderdwh.ebisfagregadorcontrato ac
+	left join siderdwh.ebisdagregadoritemcontrato ai on ai.skagregadoritem = ac.skagregadoritem 
+	where ai.cdagregador = 1
 ),
 empenho_contrato AS (
     SELECT
@@ -184,6 +196,7 @@ medicao AS (
         pg.vlpago,
         pg.sktempoultimopgto,
         c.cdtitulo,
+        tc.deagregadoritem,
         c.deobjeto,
         c.deobjetoresumido,
         c.nuprocessoinf,
@@ -214,6 +227,7 @@ medicao AS (
     LEFT JOIN liquidacao_agg lq           ON lq.skmedicao = mc.skmedicao
     LEFT JOIN pagamento_agg pg            ON pg.skmedicao = mc.skmedicao
     LEFT JOIN siderdwh.ebisdcontrato c             ON c.skcontrato = mc.skcontrato
+    left join tipo_contrato tc						on tc.skcontrato = mc.skcontrato 
     LEFT JOIN siderdwh.ebisfcontrato fc            ON fc.skcontrato = mc.skcontrato
     LEFT JOIN siderdwh.ebisdnaturezacontrato nat   ON nat.sknaturezacontrato = fc.sknaturezacontrato
     LEFT JOIN siderdwh.ebisdorgaosetor os          ON os.skorgaosetor = fc.sksetor
@@ -273,12 +287,7 @@ SELECT
     (ARRAY['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho',
            'Agosto','Setembro','Outubro','Novembro','Dezembro']
     )[EXTRACT(MONTH FROM m.dt_criacao)::int]                                AS "Mês criação",
-    CASE
-        WHEN m.denaturezacontrato = 'Obra Rodoviária' THEN 'Obra Rodoviária'
-        WHEN m.denaturezacontrato <> 'Obra Rodoviária'
-             AND UPPER(m.deobjetoresumido) LIKE '%SUPERVISÃO%' THEN 'Supervisão'
-        ELSE NULL
-    END                                                                     AS "Tipo de contrato",
+   	m.deagregadoritem                                                      AS "Tipo de contrato",
     m.empresas                                                             AS "Empresa",
     m.nmorgaosetor                                                         AS "Distrito",
     m.qt_notas                                                             AS "Qtd Notas",
@@ -322,5 +331,4 @@ SELECT
         ELSE 'Suficiente'
     END                                                                      AS "Saldo para Próxima Medição"
 FROM medicao m
---WHERE m.dt_criacao >= DATE '2026-06-01'
 ORDER BY 1, 2;

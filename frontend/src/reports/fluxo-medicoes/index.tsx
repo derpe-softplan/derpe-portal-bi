@@ -418,7 +418,7 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
                   <Field label="Contrato">{row.contrato}</Field>
                   <Field label="Medição">#{row.num_medicao}</Field>
                   <Field label="Competência">{row.mes_ano}</Field>
-                  <Field label="Natureza">{row.natureza}</Field>
+                  <Field label="Tipo de Contrato">{row.tipo_contrato ?? '—'}</Field>
                   <Field label="Tipo de contrato">{row.tipo_contrato}</Field>
                   <Field label="Distrito">{row.distrito}</Field>
                   <div className="col-span-2">
@@ -767,10 +767,10 @@ function FunilCompleto({
           const diff = expected !== undefined ? item.quantidade - expected : null
 
           return (
-            <div key={item.etapa} className="flex flex-col md:flex-row md:items-center gap-2 md:flex-1 md:min-w-[148px]">
+            <div key={item.etapa} className="flex flex-col md:flex-row md:items-stretch gap-2 md:flex-1 md:min-w-[148px]">
               <button
                 onClick={() => onEtapaClick(isActive ? null : item.etapa)}
-                className="flex-1 h-full rounded-2xl p-4 text-left transition-all hover:shadow-md hover:-translate-y-0.5"
+                className="flex-1 h-full flex flex-col rounded-2xl p-4 text-left transition-all hover:shadow-md hover:-translate-y-0.5"
                 style={{
                   border: `2px solid ${isActive ? color : color + '30'}`,
                   backgroundColor: isActive ? color + '12' : color + '07',
@@ -802,7 +802,7 @@ function FunilCompleto({
 
                 {/* Comparação com cronograma */}
                 {expected !== undefined && (
-                  <div className="mt-3 pt-2.5 border-t" style={{ borderColor: color + '25' }}>
+                  <div className="mt-auto pt-2.5 border-t" style={{ borderColor: color + '25' }}>
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] text-gray-400 dark:text-gray-500">Esperado</span>
                       <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 tabular-nums">
@@ -838,7 +838,7 @@ function FunilCompleto({
 
               {i < funil.length - 1 && (
                 <>
-                  <ArrowRight size={14} className="hidden md:block flex-shrink-0 text-gray-300" />
+                  <ArrowRight size={14} className="hidden md:block flex-shrink-0 text-gray-300 self-center" />
                   <ArrowDown size={14} className="md:hidden mx-auto text-gray-300" />
                 </>
               )}
@@ -1589,8 +1589,8 @@ function FilterBar({
   onEmpresa,
   rodovia,
   onRodovia,
-  natureza,
-  onNatureza,
+  tipoContrato,
+  onTipoContrato,
   municipio,
   onMunicipio,
   contrato,
@@ -1601,7 +1601,7 @@ function FilterBar({
   onCompetenciaAte,
   empresasOpts,
   rodoviaOpts,
-  naturezaOpts,
+  tipoContratoOpts,
   municipioOpts,
   contratoOpts,
   onLimpar,
@@ -1612,8 +1612,8 @@ function FilterBar({
   onEmpresa: (v: string[]) => void
   rodovia: string[]
   onRodovia: (v: string[]) => void
-  natureza: string[]
-  onNatureza: (v: string[]) => void
+  tipoContrato: string[]
+  onTipoContrato: (v: string[]) => void
   municipio: string[]
   onMunicipio: (v: string[]) => void
   contrato: string[]
@@ -1624,7 +1624,7 @@ function FilterBar({
   onCompetenciaAte: (v: string) => void
   empresasOpts: string[]
   rodoviaOpts: string[]
-  naturezaOpts: string[]
+  tipoContratoOpts: string[]
   municipioOpts: string[]
   contratoOpts: string[]
   onLimpar: () => void
@@ -1712,11 +1712,11 @@ function FilterBar({
         <div className="w-full md:w-44">
           <ComboBox
             multiple
-            label="Natureza"
-            value={natureza}
-            options={naturezaOpts}
-            onChange={onNatureza}
-            allLabel="Todas"
+            label="Tipo de Contrato"
+            value={tipoContrato}
+            options={tipoContratoOpts}
+            onChange={onTipoContrato}
+            allLabel="Todos"
           />
         </div>
         <div className="flex gap-3">
@@ -1778,7 +1778,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
               <HelpCircle size={16} className="text-blue-600 dark:text-blue-400" />
             </div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">
-              Rastreio de Pagamentos — Guia da tela
+              Fluxo de Medições — Guia da tela
             </h2>
           </div>
           <button
@@ -1790,10 +1790,39 @@ function HelpModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="px-6 py-5 space-y-6 text-sm text-gray-600 dark:text-gray-400">
           <p className="text-gray-500 leading-relaxed">
-            Esta tela acompanha o ciclo financeiro de cada medição — desde a aprovação pelo DER-PE
-            até o pagamento à empresa contratada. Use os filtros para focar em empresa, rodovia ou
-            período, e clique nos cards e no funil para filtrar a tabela de rastreio.
+            Este painel acompanha o ciclo de cada medição de contrato — desde a criação até o
+            pagamento final. Use os filtros para focar em empresa, rodovia ou período; clique nos
+            indicadores, no funil ou nos cards de atenção para navegar automaticamente à aba
+            Rastreio com o filtro aplicado.
           </p>
+
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
+              Abas
+            </h3>
+            <div className="space-y-2">
+              {[
+                ['Resumo', 'Visão geral: indicadores, jornada das medições e alertas de atenção imediata.'],
+                ['Análise', 'Gráficos das medições em aberto agrupadas por competência, empresa, rodovia, município e distrito. Clique nas barras para filtrar a tabela.'],
+                ['Rastreio', 'Tabela completa de medições com busca rápida, ordenação e destaque por urgência.'],
+                ['Cronograma', 'Calendário de dias úteis por mês e aderência das medições ao cronograma esperado.'],
+              ].map(([aba, desc]) => (
+                <div key={aba} className="flex gap-2">
+                  <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-[80px]">{aba}</span>
+                  <span className="text-gray-500 dark:text-gray-400">{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
+              Filtros
+            </h3>
+            <p className="text-gray-500 leading-relaxed">
+              Os filtros afetam todas as abas simultaneamente. Estão disponíveis: <span className="font-semibold text-gray-700 dark:text-gray-300">Empresa</span>, <span className="font-semibold text-gray-700 dark:text-gray-300">Contrato</span>, <span className="font-semibold text-gray-700 dark:text-gray-300">Rodovia</span>, <span className="font-semibold text-gray-700 dark:text-gray-300">Município</span>, <span className="font-semibold text-gray-700 dark:text-gray-300">Tipo de Contrato</span> e <span className="font-semibold text-gray-700 dark:text-gray-300">Competência</span> (mês/ano de referência da medição). Todos aceitam múltipla seleção.
+            </p>
+          </div>
 
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
@@ -1804,22 +1833,22 @@ function HelpModal({ onClose }: { onClose: () => void }) {
                 {
                   color: 'bg-blue-500',
                   title: 'Em Aberto',
-                  desc: 'Total de medições que ainda não foram pagas integralmente, independente da etapa. Representa toda a exposição financeira atual no fluxo de pagamentos.',
+                  desc: 'Total de medições que ainda não foram pagas integralmente, independente da etapa. Representa toda a exposição financeira atual.',
                 },
                 {
                   color: 'bg-teal-500',
                   title: 'Aguardando Pagamento',
-                  desc: 'Medições já liquidadas — empenho processado, nota aceita — mas ainda sem pagamento efetivo transferido. Ação esperada: área financeira libera o pagamento.',
+                  desc: 'Medições na etapa Liquidada — empenho processado e nota aceita — mas o pagamento financeiro ainda não foi transferido.',
                 },
                 {
                   color: 'bg-orange-500',
-                  title: 'Aguardando Nota',
-                  desc: 'Medições aprovadas e com todas as assinaturas concluídas, mas sem nota fiscal emitida pela empresa. Ação esperada: empresa emite a nota no sistema.',
+                  title: 'Aguardando Nota Fiscal',
+                  desc: 'Medições com todas as assinaturas concluídas, aguardando a empresa emitir a nota fiscal no sistema.',
                 },
                 {
                   color: 'bg-red-500',
                   title: 'Alertas Críticos',
-                  desc: 'Medições em etapas financeiras sensíveis (Ag. Nota, Nota Emitida, Liquidada ou Paga Parcialmente) sem nenhuma movimentação há mais de 30 dias. São os casos que mais exigem atenção imediata.',
+                  desc: 'Medições em etapas financeiras sensíveis (Finalizada - aguardando nota, Nota emitida, Liquidada ou Paga parcialmente) sem movimentação há mais de 30 dias.',
                 },
               ].map(({ color, title, desc }) => (
                 <div key={title} className="flex gap-3">
@@ -1838,25 +1867,19 @@ function HelpModal({ onClose }: { onClose: () => void }) {
               Jornada Completa das Medições
             </h3>
             <p className="text-gray-500 leading-relaxed mb-2">
-              Mostra quantas medições estão em cada etapa do ciclo financeiro. As etapas são, em
-              ordem:
+              Funil com as etapas do ciclo de uma medição, em ordem. Clique em qualquer etapa para
+              ir à aba Rastreio filtrada por aquela etapa.
             </p>
             <ol className="space-y-1.5 pl-1">
               {[
-                ['Criada', 'Medição aberta, sem valor lançado ainda.'],
-                ['Iniciada', 'Valor lançado, aguardando aprovação formal.'],
-                [
-                  'Assinatura pendente',
-                  'Aprovada pelo sistema, mas faltam assinaturas digitais dos fiscais.',
-                ],
-                ['Ag. Nota', 'Todas as assinaturas concluídas. Empresa deve emitir a nota fiscal.'],
-                [
-                  'Nota Emitida',
-                  'Nota fiscal recebida. Aguardando liquidação (empenho) pelo DER-PE.',
-                ],
+                ['Criada', 'Medição registrada no sistema, ainda sem valor lançado.'],
+                ['Iniciada', 'Valor lançado, aguardando aprovação pelo DER-PE.'],
+                ['Assinatura pendente', 'Aprovada, mas faltam assinaturas digitais dos fiscais.'],
+                ['Finalizada - aguardando nota', 'Todas as assinaturas concluídas. A empresa deve emitir a nota fiscal.'],
+                ['Nota emitida', 'Nota fiscal recebida. Aguardando liquidação (empenho) pelo DER-PE.'],
                 ['Liquidada', 'Empenho realizado. Aguardando pagamento financeiro.'],
-                ['Paga Parc.', 'Parte do valor foi paga. Saldo remanescente em aberto.'],
-                ['Paga Integr.', 'Pagamento 100% concluído. Medição encerrada.'],
+                ['Paga parcialmente', 'Parte do valor foi paga. Há saldo remanescente em aberto.'],
+                ['Paga integralmente', 'Pagamento 100% concluído. Medição encerrada.'],
               ].map(([etapa, desc]) => (
                 <li key={etapa} className="flex gap-2">
                   <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">{etapa}:</span>
@@ -1864,9 +1887,6 @@ function HelpModal({ onClose }: { onClose: () => void }) {
                 </li>
               ))}
             </ol>
-            <p className="text-gray-400 mt-2 text-xs">
-              Clique em qualquer etapa para filtrar a tabela de rastreio abaixo.
-            </p>
           </div>
 
           <div>
@@ -1875,28 +1895,24 @@ function HelpModal({ onClose }: { onClose: () => void }) {
             </h3>
             <div className="space-y-2.5">
               <div>
-                <p className="font-semibold text-gray-700">Saldo Insuficiente de Empenho</p>
+                <p className="font-semibold text-gray-700 dark:text-gray-300">Saldo Insuf. de Empenho</p>
                 <p className="text-gray-500 leading-relaxed">
-                  Contratos onde o saldo de empenho (total empenhado menos total liquidado) é menor
-                  que o valor da última medição aprovada. Indica risco de não conseguir empenhar a
-                  próxima medição de mesma magnitude.
+                  Contratos cujo saldo disponível de empenho é menor que o valor da última medição
+                  aprovada. Indica risco de não conseguir empenhar a próxima medição.
                 </p>
               </div>
               <div>
-                <p className="font-semibold text-gray-700">
-                  Contratos com Vencimento nos Próximos 60 Dias
-                </p>
+                <p className="font-semibold text-gray-700 dark:text-gray-300">Vencem em 60 Dias</p>
                 <p className="text-gray-500 leading-relaxed">
-                  Contratos cujo prazo de execução vence nos próximos 60 dias. Contratos vencidos
-                  não podem receber novas medições — atenção para emissão de aditivos ou
-                  encerramento dentro do prazo.
+                  Contratos com prazo de execução encerrando nos próximos 60 dias. Contratos
+                  vencidos não recebem novas medições — verifique a necessidade de aditivo.
                 </p>
               </div>
               <div>
-                <p className="font-semibold text-gray-700">Maior Gargalo</p>
+                <p className="font-semibold text-gray-700 dark:text-gray-300">Maior Gargalo</p>
                 <p className="text-gray-500 leading-relaxed">
-                  A etapa financeira com maior valor total represado entre todas as etapas críticas.
-                  Indica onde concentrar energia para destravar o maior volume de recursos.
+                  A etapa crítica com maior valor total represado. Indica onde concentrar esforço
+                  para destravar o maior volume de recursos.
                 </p>
               </div>
             </div>
@@ -1904,25 +1920,23 @@ function HelpModal({ onClose }: { onClose: () => void }) {
 
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
-              Tabela de Rastreio
+              Aba Rastreio
             </h3>
             <p className="text-gray-500 leading-relaxed mb-2">
-              Lista detalhada de todas as medições, ordenada por urgência:
+              Lista todas as medições com as colunas: Empresa, Rodovia, Contrato/Med., Competência,
+              Valor, Etapa e Dias (tempo na etapa atual). Ordenada por urgência por padrão.
             </p>
             <ul className="space-y-1 pl-1 text-gray-500">
               <li>
-                · Linhas <span className="text-red-600 font-semibold">vermelhas</span> = etapa
+                · Linhas <span className="text-red-600 font-semibold">vermelhas</span> — etapa
                 crítica há mais de 30 dias
               </li>
               <li>
-                · Linhas <span className="text-amber-600 font-semibold">amarelas</span> = etapa
-                crítica há 15–30 dias
+                · Linhas <span className="text-amber-600 font-semibold">amarelas</span> — etapa
+                crítica entre 15 e 30 dias
               </li>
-              <li>
-                · A coluna <span className="font-semibold text-gray-700">Dias</span> indica há
-                quantos dias a medição está parada na etapa atual
-              </li>
-              <li>· Use a busca rápida para filtrar por empresa, contrato ou rodovia</li>
+              <li>· Busca rápida filtra por empresa, contrato ou rodovia</li>
+              <li>· Clique em qualquer linha para ver o detalhe completo da medição</li>
             </ul>
           </div>
         </div>
@@ -2182,7 +2196,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
 
   const [empresa, setEmpresa] = useState<string[]>([])
   const [rodovia, setRodovia] = useState<string[]>([])
-  const [natureza, setNatureza] = useState<string[]>([])
+  const [tipoContrato, setTipoContrato] = useState<string[]>([])
   const [municipio, setMunicipio] = useState<string[]>([])
   const [contrato, setContrato] = useState<string[]>([])
   const [competenciaDe, setCompetenciaDe] = useState(defaultCompetenciaDe)
@@ -2220,7 +2234,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
           rows.flatMap((r) => (r.rodovias || '').split(',').map((s) => s.trim())).filter(Boolean)
         ),
       ].sort(),
-      naturezas: [...new Set(rows.map((r) => r.natureza).filter(Boolean))].sort(),
+      tiposContrato: [...new Set(rows.map((r) => r.tipo_contrato).filter(Boolean))].sort() as string[],
       distritos: [...new Set(rows.map((r) => r.distrito).filter(Boolean))].sort(),
       municipios: [
         ...new Set(
@@ -2246,7 +2260,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
         )
           return false
       }
-      if (natureza.length > 0 && !natureza.includes(r.natureza)) return false
+      if (tipoContrato.length > 0 && !tipoContrato.includes(r.tipo_contrato ?? '')) return false
       if (municipio.length > 0) {
         const rowMunicipios = (r.municipios || '').split(',').map((v) => v.trim())
         if (
@@ -2275,7 +2289,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     empresa,
     contrato,
     rodovia,
-    natureza,
+    tipoContrato,
     municipio,
     distritoFiltro,
     competenciaDe,
@@ -2308,7 +2322,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     empresa.length > 0,
     contrato.length > 0,
     rodovia.length > 0,
-    natureza.length > 0,
+    tipoContrato.length > 0,
     municipio.length > 0,
     distritoFiltro.length > 0,
     competenciaDe !== defaultCompetenciaDe,
@@ -2319,7 +2333,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     setEmpresa([])
     setContrato([])
     setRodovia([])
-    setNatureza([])
+    setTipoContrato([])
     setMunicipio([])
     setCompetenciaDe(defaultCompetenciaDe)
     setCompetenciaAte(defaultCompetenciaAte)
@@ -2515,8 +2529,8 @@ export function FluxoMedicoes({ data: rawData }: Props) {
           onRodovia={setRodovia}
           municipio={municipio}
           onMunicipio={setMunicipio}
-          natureza={natureza}
-          onNatureza={setNatureza}
+          tipoContrato={tipoContrato}
+          onTipoContrato={setTipoContrato}
           competenciaDe={competenciaDe}
           onCompetenciaDe={setCompetenciaDe}
           competenciaAte={competenciaAte}
@@ -2525,7 +2539,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
           contratoOpts={options.contratos}
           rodoviaOpts={options.rodovias}
           municipioOpts={options.municipios}
-          naturezaOpts={options.naturezas}
+          tipoContratoOpts={options.tiposContrato}
           onLimpar={limpar}
           activeCount={activeFilterCount}
           onHelp={() => setShowHelp(true)}
@@ -2649,7 +2663,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
                 tooltip="Medições já fechadas e que ainda não foram pagas."
               />
               <KpiCard
-                title="Ag. Pagamento"
+                title="Aguardando Pagamento"
                 value={fmtNum(kpis.aguardando_pagamento)}
                 subtitle={`${brl(kpis.valor_aguardando_pgto)} liquidados`}
                 icon={<Banknote size={18} />}
@@ -2660,7 +2674,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
                 tooltip="Medições já liquidadas aguardando transferência do pagamento."
               />
               <KpiCard
-                title="Ag. Nota Fiscal"
+                title="Aguardando Nota Fiscal"
                 value={fmtNum(kpis.aguardando_nota)}
                 subtitle={`${brl(kpis.valor_aguardando_nota)} em aberto`}
                 icon={<FileText size={18} />}

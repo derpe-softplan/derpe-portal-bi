@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { BarChart3, Clock, AlertCircle } from 'lucide-react'
+import { BarChart3, Clock, AlertCircle, Download } from 'lucide-react'
 import clsx from 'clsx'
 import { portalApi, parseUTC, ReportCard, resolveImageUrl } from '../../services/api'
 import { resolveThumbnailBySlug } from '../../panels/registry'
@@ -98,8 +98,11 @@ function FilterChip({
   )
 }
 
+type Section = 'paineis' | 'extracoes'
+
 export default function Portal() {
   const { user } = useAuth()
+  const [section, setSection] = useState<Section>('paineis')
   const [filterSistemas, setFilterSistemas] = useState<string[]>([])
   const [filterTipos, setFilterTipos] = useState<string[]>([])
 
@@ -144,69 +147,120 @@ export default function Portal() {
 
   return (
     <div>
+      {/* ── Cabeçalho ────────────────────────────────────────────────────────── */}
       <div className="mb-5">
         <p className="text-sm text-gov-blue dark:text-blue-400 font-medium mb-0.5">
           Olá, {user?.full_name?.split(' ')[0]}!
         </p>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Relatórios disponíveis</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {filtered.length} relatório(s) publicado(s) para o seu perfil
-        </p>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+          {section === 'paineis' ? 'Painéis disponíveis' : 'Extrações'}
+        </h1>
+        {section === 'paineis' && (
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {filtered.length} painel(is) publicado(s) para o seu perfil
+          </p>
+        )}
+        {section === 'extracoes' && (
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Exportações de dados disponíveis para download
+          </p>
+        )}
       </div>
 
-      {/* ── Filtros ─────────────────────────────────────────────────────────── */}
-      {reports && reports.length > 0 && (
-        <div className="card px-4 py-3 mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-              Sistema
-            </span>
-            {SISTEMAS.map((s) => (
-              <FilterChip
-                key={s}
-                label={s}
-                active={filterSistemas.includes(s)}
-                onClick={() => toggle(filterSistemas, setFilterSistemas, s)}
-              />
-            ))}
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-              Tipo
-            </span>
-            {TIPOS.map((t) => (
-              <FilterChip
-                key={t}
-                label={t}
-                active={filterTipos.includes(t)}
-                onClick={() => toggle(filterTipos, setFilterTipos, t)}
-              />
-            ))}
-          </div>
-          {hasFilters && (
-            <button
-              className="ml-auto text-xs text-gray-400 hover:text-gray-600 transition-colors"
-              onClick={() => { setFilterSistemas([]); setFilterTipos([]) }}
-            >
-              Limpar filtros
-            </button>
+      {/* ── Tabs de seção ────────────────────────────────────────────────────── */}
+      <div className="flex gap-1 mb-5 border-b border-gray-200 dark:border-gray-700">
+        {([
+          { id: 'paineis', label: 'Painéis', icon: <BarChart3 size={14} /> },
+          { id: 'extracoes', label: 'Extrações', icon: <Download size={14} /> },
+        ] as { id: Section; label: string; icon: React.ReactNode }[]).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setSection(tab.id)}
+            className={clsx(
+              'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+              section === tab.id
+                ? 'border-gov-blue text-gov-blue dark:text-blue-400 dark:border-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            )}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Painéis ──────────────────────────────────────────────────────────── */}
+      {section === 'paineis' && (
+        <>
+          {reports && reports.length > 0 && (
+            <div className="card px-4 py-3 mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+                  Sistema
+                </span>
+                {SISTEMAS.map((s) => (
+                  <FilterChip
+                    key={s}
+                    label={s}
+                    active={filterSistemas.includes(s)}
+                    onClick={() => toggle(filterSistemas, setFilterSistemas, s)}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+                  Tipo
+                </span>
+                {TIPOS.map((t) => (
+                  <FilterChip
+                    key={t}
+                    label={t}
+                    active={filterTipos.includes(t)}
+                    onClick={() => toggle(filterTipos, setFilterTipos, t)}
+                  />
+                ))}
+              </div>
+              {hasFilters && (
+                <button
+                  className="ml-auto text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  onClick={() => { setFilterSistemas([]); setFilterTipos([]) }}
+                >
+                  Limpar filtros
+                </button>
+              )}
+            </div>
           )}
-        </div>
+
+          {filtered.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filtered.map((r) => (
+                <ReportCardItem key={r.id} report={r} />
+              ))}
+            </div>
+          ) : (
+            <div className="card p-12 text-center">
+              <BarChart3 size={40} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">
+                {hasFilters
+                  ? 'Nenhum painel corresponde aos filtros selecionados.'
+                  : 'Nenhum painel disponível para o seu perfil.'}
+              </p>
+            </div>
+          )}
+        </>
       )}
 
-      {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((r) => (
-            <ReportCardItem key={r.id} report={r} />
-          ))}
-        </div>
-      ) : (
+      {/* ── Extrações ────────────────────────────────────────────────────────── */}
+      {section === 'extracoes' && (
         <div className="card p-12 text-center">
-          <BarChart3 size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-500">
-            {hasFilters
-              ? 'Nenhum relatório corresponde aos filtros selecionados.'
-              : 'Nenhum relatório disponível para o seu perfil.'}
+          <div className="w-14 h-14 bg-gray-100 dark:bg-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Download size={26} className="text-gray-400 dark:text-gray-500" />
+          </div>
+          <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">
+            Nenhuma extração disponível
+          </h3>
+          <p className="text-sm text-gray-400 dark:text-gray-500 max-w-xs mx-auto">
+            Em breve serão disponibilizadas exportações de dados para download direto nesta seção.
           </p>
         </div>
       )}
