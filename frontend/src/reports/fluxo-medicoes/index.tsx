@@ -3,15 +3,12 @@ import {
   ArrowRight,
   ArrowDown,
   AlertTriangle,
-  Banknote,
   ChevronUp,
   ChevronDown,
   ChevronsUpDown,
   Search,
   X,
-  FileText,
   Calendar,
-  TrendingDown,
   CircleAlert,
   Building2,
   BarChart3,
@@ -1053,188 +1050,9 @@ function ContratosVencendoModal({
   )
 }
 
-// ── Alertas ───────────────────────────────────────────────────────────────────
+// ── Constante de etapas pagas ─────────────────────────────────────────────────
 
 const ETAPAS_PAGAS = new Set(['Paga parcialmente', 'Paga integralmente'])
-
-function AlertasPanel({
-  data,
-  allData,
-  onFiltrarEtapa,
-}: {
-  data: FluxoRow[]
-  allData: FluxoRow[]
-  onFiltrarEtapa: (e: string) => void
-}) {
-  const [showVencendoModal, setShowVencendoModal] = useState(false)
-
-  const saldoInsuficiente = useMemo(() => {
-    const seen = new Set<string>()
-    const contratos: FluxoRow[] = []
-    for (const r of allData) {
-      if (!seen.has(r.contrato)) {
-        seen.add(r.contrato)
-        contratos.push(r)
-      }
-    }
-    const rows = contratos.filter((r) => r.saldo_insuficiente)
-    return { quantidade: rows.length, saldo_total: rows.reduce((s, r) => s + r.saldo_empenho, 0) }
-  }, [allData])
-
-  const contratosVencendo = useMemo(() => {
-    const hoje = new Date()
-    hoje.setHours(0, 0, 0, 0)
-    const limite = new Date(hoje)
-    limite.setDate(hoje.getDate() + 60)
-    const seen = new Set<string>()
-    const lista: ContratoVencendo[] = []
-    for (const r of allData) {
-      if (!r.dt_fim_execucao || seen.has(r.contrato)) continue
-      seen.add(r.contrato)
-      const dt = new Date(r.dt_fim_execucao)
-      if (dt >= hoje && dt <= limite) {
-        const diasRestantes = Math.ceil((dt.getTime() - hoje.getTime()) / 86_400_000)
-        lista.push({
-          contrato: r.contrato,
-          empresa: r.empresa,
-          rodovias: r.rodovias,
-          vencimento: dt,
-          diasRestantes,
-        })
-      }
-    }
-    lista.sort((a, b) => a.diasRestantes - b.diasRestantes)
-    return lista
-  }, [allData])
-
-  const gargalo = useMemo(() => {
-    let best: { etapa: string; quantidade: number; valor: number } | null = null
-    for (const etapa of ETAPAS_CRITICAS) {
-      const rows = data.filter((r) => r.etapa_jornada === etapa)
-      const valor = rows.reduce((s, r) => s + r.vlevento, 0)
-      if (!best || valor > best.valor) best = { etapa, quantidade: rows.length, valor }
-    }
-    return best?.valor ? best : null
-  }, [data])
-
-  return (
-    <>
-      {showVencendoModal && (
-        <ContratosVencendoModal
-          contratos={contratosVencendo}
-          onClose={() => setShowVencendoModal(false)}
-        />
-      )}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div
-          className={`card border-l-4 ${saldoInsuficiente.quantidade > 0 ? 'border-l-amber-500' : 'border-l-gray-200'}`}
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className={`p-2 rounded-lg flex-shrink-0 ${saldoInsuficiente.quantidade > 0 ? 'bg-amber-100' : 'bg-gray-100'}`}
-            >
-              <AlertTriangle
-                size={16}
-                className={saldoInsuficiente.quantidade > 0 ? 'text-amber-600' : 'text-gray-400'}
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Saldo Insuf. de Empenho
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight mt-0.5">
-                {fmtNum(saldoInsuficiente.quantidade)}
-                <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-1.5">contratos</span>
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Saldo disponível: {brl(saldoInsuficiente.saldo_total)}
-              </p>
-              <p className="text-xs text-amber-600 font-semibold mt-1">
-                Saldo {'<'} última medição
-              </p>
-            </div>
-          </div>
-          {saldoInsuficiente.quantidade > 0 && (
-            <button
-              onClick={() => onFiltrarEtapa('SALDO_INSUFICIENTE')}
-              className="mt-3 w-full text-xs font-semibold text-amber-600 hover:text-amber-800 text-center py-1.5 border border-amber-200 rounded-lg hover:bg-amber-50 transition-colors"
-            >
-              Ver medições
-            </button>
-          )}
-        </div>
-
-        <div
-          className={`card border-l-4 ${contratosVencendo.length > 0 ? 'border-l-red-500' : 'border-l-gray-200'}`}
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className={`p-2 rounded-lg flex-shrink-0 ${contratosVencendo.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}
-            >
-              <Calendar
-                size={16}
-                className={contratosVencendo.length > 0 ? 'text-red-600' : 'text-gray-400'}
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Vencem em 60 Dias
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight mt-0.5">
-                {fmtNum(contratosVencendo.length)}
-                <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-1.5">contratos</span>
-              </p>
-              <p className="text-xs text-red-500 font-semibold mt-1">Prazo de execução próximo</p>
-            </div>
-          </div>
-          {contratosVencendo.length > 0 && (
-            <button
-              onClick={() => setShowVencendoModal(true)}
-              className="mt-3 w-full text-xs font-semibold text-red-600 hover:text-red-800 text-center py-1.5 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-            >
-              Ver contratos
-            </button>
-          )}
-        </div>
-
-        <div className={`card border-l-4 ${gargalo ? 'border-l-violet-500' : 'border-l-gray-200'}`}>
-          <div className="flex items-start gap-3">
-            <div
-              className={`p-2 rounded-lg flex-shrink-0 ${gargalo ? 'bg-violet-100' : 'bg-gray-100'}`}
-            >
-              <TrendingDown size={16} className={gargalo ? 'text-violet-600' : 'text-gray-400'} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Maior Gargalo
-              </p>
-              {gargalo ? (
-                <>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight mt-0.5">
-                    {fmtNum(gargalo.quantidade)}
-                    <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-1.5">medições</span>
-                  </p>
-                  <p className="text-xs text-violet-600 font-semibold mt-0.5">{gargalo.etapa}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{brl(gargalo.valor)} represados</p>
-                </>
-              ) : (
-                <p className="text-sm text-gray-400 mt-2">Nenhum gargalo identificado</p>
-              )}
-            </div>
-          </div>
-          {gargalo && (
-            <button
-              onClick={() => onFiltrarEtapa(gargalo.etapa)}
-              className="mt-3 w-full text-xs font-semibold text-violet-600 hover:text-violet-800 text-center py-1.5 border border-violet-200 rounded-lg hover:bg-violet-50 transition-colors"
-            >
-              Ver medições
-            </button>
-          )}
-        </div>
-      </div>
-    </>
-  )
-}
 
 // ── Gráficos de dimensão (NaoPagas) ──────────────────────────────────────────
 
@@ -2278,6 +2096,7 @@ function AderenciaCronograma({ rows }: { rows: FluxoRow[] }) {
 
 // ── Painel principal ──────────────────────────────────────────────────────────
 
+
 interface Props {
   data: Record<string, unknown>[]
 }
@@ -2306,6 +2125,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     'resumo'
   )
   const [selectedRow, setSelectedRow] = useState<FluxoRow | null>(null)
+  const [showVencendoModal, setShowVencendoModal] = useState(false)
   const navigate = useNavigate()
 
   const { data: otherReports = [] } = useQuery({
@@ -2550,22 +2370,52 @@ export function FluxoMedicoes({ data: rawData }: Props) {
   // KPIs
   const kpis = useMemo(() => {
     const emAberto = naoPagasRows
-    const aguPgto = filteredBase.filter((r) => r.etapa_jornada === 'Liquidada')
-    const aguNota = filteredBase.filter((r) => r.etapa_jornada === 'Finalizada - aguardando nota')
     const alertasCrit = filteredBase.filter(
       (r) => ETAPAS_CRITICAS.has(r.etapa_jornada) && r.dias_na_etapa >= 30
     )
     return {
       em_aberto: emAberto.length,
       valor_em_aberto: emAberto.reduce((s, r) => s + r.vlevento, 0),
-      aguardando_pagamento: aguPgto.length,
-      valor_aguardando_pgto: aguPgto.reduce((s, r) => s + r.vlevento, 0),
-      aguardando_nota: aguNota.length,
-      valor_aguardando_nota: aguNota.reduce((s, r) => s + r.vlevento, 0),
       alertas_criticos: alertasCrit.length,
       valor_alertas: alertasCrit.reduce((s, r) => s + r.vlevento, 0),
     }
   }, [filteredBase, naoPagasRows])
+
+  const alertasKpis = useMemo(() => {
+    const seen = new Set<string>()
+    const contratoRows: FluxoRow[] = []
+    for (const r of rows) {
+      if (!seen.has(r.contrato)) { seen.add(r.contrato); contratoRows.push(r) }
+    }
+    const saldoInsuf = contratoRows.filter((r) => r.saldo_insuficiente)
+
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+    const limite = new Date(hoje); limite.setDate(hoje.getDate() + 60)
+    const seenV = new Set<string>()
+    const vencendo: ContratoVencendo[] = []
+    for (const r of rows) {
+      if (!r.dt_fim_execucao || seenV.has(r.contrato)) continue
+      seenV.add(r.contrato)
+      const dt = new Date(r.dt_fim_execucao)
+      if (dt >= hoje && dt <= limite) {
+        vencendo.push({
+          contrato: r.contrato,
+          empresa: r.empresa,
+          rodovias: r.rodovias,
+          vencimento: dt,
+          diasRestantes: Math.ceil((dt.getTime() - hoje.getTime()) / 86_400_000),
+        })
+      }
+    }
+    vencendo.sort((a, b) => a.diasRestantes - b.diasRestantes)
+
+    return {
+      saldo_insuficiente: saldoInsuf.length,
+      saldo_total: saldoInsuf.reduce((s, r) => s + r.saldo_empenho, 0),
+      vencendo_60d: vencendo.length,
+      vencendo_lista: vencendo,
+    }
+  }, [rows])
 
   function dimItems(key: (r: FluxoRow) => string): DimItem[] {
     const acc: Record<string, { valor: number; quantidade: number }> = {}
@@ -2853,30 +2703,6 @@ export function FluxoMedicoes({ data: rawData }: Props) {
                 tooltip="Medições já fechadas e que ainda não foram pagas."
               />
               <KpiCard
-                title="Aguardando Pagamento"
-                value={fmtNum(kpis.aguardando_pagamento)}
-                subtitle={`${brl(kpis.valor_aguardando_pgto)} liquidados`}
-                icon={<Banknote size={18} />}
-                accent="teal"
-                onClick={
-                  kpis.aguardando_pagamento ? () => handleFiltrarEtapa('Liquidada') : undefined
-                }
-                tooltip="Medições já liquidadas aguardando transferência do pagamento."
-              />
-              <KpiCard
-                title="Aguardando Nota Fiscal"
-                value={fmtNum(kpis.aguardando_nota)}
-                subtitle={`${brl(kpis.valor_aguardando_nota)} em aberto`}
-                icon={<FileText size={18} />}
-                accent="orange"
-                onClick={
-                  kpis.aguardando_nota
-                    ? () => handleFiltrarEtapa('Finalizada - aguardando nota')
-                    : undefined
-                }
-                tooltip="Medições aprovadas aguardando nota fiscal da empresa."
-              />
-              <KpiCard
                 title="Alertas Críticos"
                 value={fmtNum(kpis.alertas_criticos)}
                 subtitle={`${brl(kpis.valor_alertas)} represados +30d`}
@@ -2886,6 +2712,30 @@ export function FluxoMedicoes({ data: rawData }: Props) {
                   kpis.alertas_criticos ? () => handleFiltrarEtapa('ALERTAS_CRITICOS') : undefined
                 }
                 tooltip="Medições em etapas financeiras sem movimentação há mais de 30 dias."
+              />
+              <KpiCard
+                title="Saldo Insuficiente"
+                value={fmtNum(alertasKpis.saldo_insuficiente)}
+                subtitle={`Saldo disponível: ${brl(alertasKpis.saldo_total)}`}
+                icon={<AlertTriangle size={18} />}
+                accent="orange"
+                onClick={
+                  alertasKpis.saldo_insuficiente
+                    ? () => handleFiltrarEtapa('SALDO_INSUFICIENTE')
+                    : undefined
+                }
+                tooltip="Contratos cujo saldo de empenho é menor que o valor da última medição."
+              />
+              <KpiCard
+                title="Vencem em 60 dias"
+                value={fmtNum(alertasKpis.vencendo_60d)}
+                subtitle="contratos com prazo próximo"
+                icon={<Calendar size={18} />}
+                accent="red"
+                onClick={
+                  alertasKpis.vencendo_60d ? () => setShowVencendoModal(true) : undefined
+                }
+                tooltip="Contratos com data fim de execução nos próximos 60 dias."
               />
             </div>
 
@@ -2922,14 +2772,6 @@ export function FluxoMedicoes({ data: rawData }: Props) {
               />
             </div>
 
-            <div>
-              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Atenção Imediata</h2>
-              <AlertasPanel
-                data={filteredBase}
-                allData={rows}
-                onFiltrarEtapa={handleFiltrarEtapa}
-              />
-            </div>
           </div>
         )}
 
@@ -3057,6 +2899,12 @@ export function FluxoMedicoes({ data: rawData }: Props) {
       </div>
 
       {selectedRow && <MedicaoModal row={selectedRow} onClose={() => setSelectedRow(null)} />}
+      {showVencendoModal && (
+        <ContratosVencendoModal
+          contratos={alertasKpis.vencendo_lista}
+          onClose={() => setShowVencendoModal(false)}
+        />
+      )}
     </>
   )
 }
