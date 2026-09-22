@@ -23,6 +23,7 @@ import {
   List,
   CalendarDays,
   TrendingUp,
+  FileDown,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
@@ -70,6 +71,7 @@ export interface FluxoRow {
   skmedicao: number
   nutitulo: number
   situacao_contrato: string | null
+  fl_medicao_final: string | null
 }
 
 export interface PendenteCriacao {
@@ -193,6 +195,7 @@ export function mapSnapshot(raw: Record<string, unknown>[]): FluxoRow[] {
       skmedicao: Number(r['SkMedicao'] ?? 0),
       nutitulo: Number(r['NuTitulo'] ?? 0),
       situacao_contrato: r['Situação do Contrato'] ? String(r['Situação do Contrato']) : null,
+      fl_medicao_final: r['Medição Final'] ? String(r['Medição Final']) : null,
     }
     row.dias_na_etapa = computeDias(row)
     return row
@@ -266,6 +269,13 @@ const brlFull = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
 const fmtNum = (v: number) => v.toLocaleString('pt-BR')
+
+// ── Exportação Excel ──────────────────────────────────────────────────────────
+
+function exportXLSX(filename: string, rows: Record<string, unknown>[]) {
+  if (!rows.length) return
+  portalApi.downloadFiltered('fluxo-medicoes', filename, rows).catch(console.error)
+}
 
 // ── Badges ────────────────────────────────────────────────────────────────────
 
@@ -607,12 +617,37 @@ function DrillModal({
               ver detalhes
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() =>
+                exportXLSX(
+                  `drill-${expectedStage.toLowerCase().replace(/\s+/g, '-')}`,
+                  rows.map((r) => ({
+                    Contrato: r.contrato,
+                    'Medição': r.num_medicao,
+                    Empresa: r.empresa,
+                    Distrito: r.distrito,
+                    Rodovias: r.rodovias,
+                    Competência: r.mes_ano,
+                    'Etapa Atual': r.etapa_jornada,
+                    'Etapa Esperada': expectedStage,
+                    'Dias na Etapa': r.dias_na_etapa,
+                    'Valor (R$)': r.vlevento,
+                  }))
+                )
+              }
+              title="Exportar CSV"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <FileDown size={16} />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -723,9 +758,34 @@ function PendentesCriacaoSection({ pendentes }: { pendentes: PendenteCriacao[] }
         <span className="text-xs bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-full font-semibold ml-1">
           {pendentes.length} em {byContract.size} {byContract.size === 1 ? 'contrato' : 'contratos'}
         </span>
-        <span className="ml-auto text-amber-500">
-          {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-        </span>
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              exportXLSX(
+                'pendentes-criacao',
+                pendentes.map((p) => ({
+                  Contrato: p.contrato,
+                  Empresa: p.empresa,
+                  Distrito: p.distrito,
+                  Rodovias: p.rodovias,
+                  Municípios: p.municipios,
+                  Natureza: p.natureza,
+                  'Tipo de Contrato': p.tipo_contrato ?? '',
+                  Competência: p.mes_ano,
+                  'Fim Execução': p.dt_fim_execucao ?? '',
+                }))
+              )
+            }}
+            title="Exportar CSV"
+            className="p-1 rounded text-amber-500 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+          >
+            <FileDown size={14} />
+          </button>
+          <span className="text-amber-500">
+            {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </span>
+        </div>
       </button>
 
       {open && (
@@ -983,12 +1043,32 @@ function ContratosVencendoModal({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() =>
+                exportXLSX(
+                  'contratos-vencendo',
+                  contratos.map((c) => ({
+                    Contrato: c.contrato,
+                    Empresa: c.empresa,
+                    Rodovias: c.rodovias,
+                    Vencimento: c.vencimento.toLocaleDateString('pt-BR'),
+                    'Dias Restantes': c.diasRestantes,
+                  }))
+                )
+              }
+              title="Exportar CSV"
+              className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <FileDown size={16} />
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
         <div className="overflow-y-auto">
           <table className="w-full text-sm">
@@ -1393,10 +1473,41 @@ function FluxoTable({
             </button>
           )}
         </div>
-        <span className="text-xs text-gray-400">
-          {fmtNum(sorted.length)} medições
-          {sorted.length !== data.length && ` (de ${fmtNum(data.length)})`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">
+            {fmtNum(sorted.length)} medições
+          </span>
+          <button
+            onClick={() =>
+              exportXLSX(
+                'rastreio-medicoes',
+                sorted.map((r) => ({
+                  Contrato: r.contrato,
+                  'Medição': r.num_medicao,
+                  Empresa: r.empresa,
+                  Distrito: r.distrito,
+                  Rodovias: r.rodovias,
+                  Municípios: r.municipios,
+                  Competência: r.mes_ano,
+                  'Etapa Atual': r.etapa_jornada,
+                  'Status Pagamento': r.status_pgto,
+                  'Dias na Etapa': r.dias_na_etapa,
+                  'PI+PR (R$)': r.vlevento,
+                  'Valor Pago (R$)': r.valor_pago,
+                  '% Pago': r.vlevento > 0 ? +((r.valor_pago / r.vlevento) * 100).toFixed(1) : '',
+                  'Possível Retenção': r.etapa_jornada === 'Paga parcialmente' && r.vlevento > 0 && (100 - (r.valor_pago / r.vlevento) * 100) <= 12 ? 'Sim' : '',
+                  'Empenho Total (R$)': r.empenho_total,
+                  'Saldo Empenho (R$)': r.saldo_empenho,
+                }))
+              )
+            }
+            title="Exportar Excel"
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            <FileDown size={13} />
+            Excel
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
@@ -1411,7 +1522,10 @@ function FluxoTable({
                 Contrato / Med.
               </th>
               <ColHeader label="Competência" col="mes_ano" />
-              <ColHeader label="Valor" col="vlevento" />
+              <ColHeader label="PI+PR" col="vlevento" />
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                Valor Pago
+              </th>
               <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Etapa
               </th>
@@ -1421,7 +1535,7 @@ function FluxoTable({
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {pageData.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-sm text-gray-400">
+                <td colSpan={8} className="px-3 py-10 text-center text-sm text-gray-400">
                   Nenhuma medição encontrada
                 </td>
               </tr>
@@ -1455,8 +1569,39 @@ function FluxoTable({
                   <td className="px-3 py-2.5 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                     {row.mes_ano || '—'}
                   </td>
-                  <td className="px-3 py-2.5 text-sm font-semibold text-gray-800 dark:text-gray-200 whitespace-nowrap text-right">
+                  <td className="px-3 py-2.5 text-sm font-semibold text-gray-800 dark:text-gray-200 whitespace-nowrap">
                     {brlFull(row.vlevento)}
+                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    {row.valor_pago > 0 ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                          {brlFull(row.valor_pago)}
+                        </span>
+                        {row.etapa_jornada === 'Paga parcialmente' && row.vlevento > 0 && (() => {
+                          const pctPago = (row.valor_pago / row.vlevento) * 100
+                          const pctRestante = 100 - pctPago
+                          const retencao = pctRestante <= 12
+                          return (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className="text-xs text-gray-400">
+                                {pctPago.toFixed(1)}% pago · {pctRestante.toFixed(1)}% restante
+                              </span>
+                              {retencao && (
+                                <span
+                                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 whitespace-nowrap"
+                                  title="Diferença ≤ 12% — pode ser retenção contratual"
+                                >
+                                  possível retenção
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
+                    )}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{etapaBadge(row.etapa_jornada)}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">
@@ -2244,13 +2389,37 @@ export function FluxoMedicoes({ data: rawData }: Props) {
       byContract.get(r.contrato)!.push(r)
     }
 
+    // Para contratos de natureza Continuada, usar apenas o mais recente (maior REN N)
+    const excludedContratos = new Set<string>()
+    const continuadaGroups = new Map<string, string[]>()
+    for (const [cod, cRows] of byContract) {
+      if (!cRows[0].natureza?.toLowerCase().includes('continuada')) continue
+      const base = cod.replace(/ REN \d+$/i, '').trim()
+      if (!continuadaGroups.has(base)) continuadaGroups.set(base, [])
+      continuadaGroups.get(base)!.push(cod)
+    }
+    for (const [, codes] of continuadaGroups) {
+      if (codes.length <= 1) continue
+      const sorted = [...codes].sort((a, b) => {
+        const aNum = (a.match(/ REN (\d+)$/i)?.[1] ?? '0')
+        const bNum = (b.match(/ REN (\d+)$/i)?.[1] ?? '0')
+        return parseInt(aNum) - parseInt(bNum)
+      })
+      for (let i = 0; i < sorted.length - 1; i++) excludedContratos.add(sorted[i])
+    }
+
     const pendentes: PendenteCriacao[] = []
 
     for (const [, contratoRows] of byContract) {
+      if (excludedContratos.has(contratoRows[0].contrato)) continue
       const sample = contratoRows[0]
 
       // Só contratos em andamento
       if (sample.situacao_contrato !== 'Andamento') continue
+
+      // Se a última medição foi marcada como final, o ciclo do contrato está encerrado
+      const lastRow = contratoRows.reduce((a, b) => (a.skmedicao > b.skmedicao ? a : b))
+      if (lastRow.fl_medicao_final === 'S') continue
 
       const existingComps = new Set<string>()
       for (const r of contratoRows) {
@@ -2296,7 +2465,15 @@ export function FluxoMedicoes({ data: rawData }: Props) {
       }
     }
 
-    return pendentes.sort((a, b) => {
+    const result = pendentes.filter((p) => {
+      const [mm, yyyy] = p.mes_ano.split('/')
+      const pKey = mm && yyyy ? `${yyyy}-${mm}` : ''
+      if (competenciaDe && pKey < competenciaDe) return false
+      if (competenciaAte && pKey > competenciaAte) return false
+      return true
+    })
+
+    return result.sort((a, b) => {
       const cc = a.contrato.localeCompare(b.contrato)
       if (cc !== 0) return cc
       const pa = parseMesAno(a.mes_ano)
@@ -2304,7 +2481,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
       if (!pa || !pb) return 0
       return pa.year !== pb.year ? pa.year - pb.year : pa.month - pb.month
     })
-  }, [rows, empresa, contrato, rodovia, tipoContrato, municipio, distritoFiltro])
+  }, [rows, empresa, contrato, rodovia, tipoContrato, municipio, distritoFiltro, competenciaDe, competenciaAte])
 
   // Com etapa (para tabela)
   const filtered = useMemo(() => {
@@ -2416,6 +2593,14 @@ export function FluxoMedicoes({ data: rawData }: Props) {
       vencendo_lista: vencendo,
     }
   }, [rows])
+
+  const contratosAndamento = useMemo(() => {
+    const seen = new Set<string>()
+    for (const r of filteredBase) {
+      if (r.situacao_contrato === 'Andamento') seen.add(r.contrato)
+    }
+    return seen.size
+  }, [filteredBase])
 
   function dimItems(key: (r: FluxoRow) => string): DimItem[] {
     const acc: Record<string, { valor: number; quantidade: number }> = {}
@@ -2692,7 +2877,15 @@ export function FluxoMedicoes({ data: rawData }: Props) {
 
         {activePage === 'resumo' && (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <KpiCard
+                title="Em Andamento"
+                value={fmtNum(contratosAndamento)}
+                subtitle="contratos ativos no filtro atual"
+                icon={<TrendingUp size={18} />}
+                accent="blue"
+                tooltip="Contratos com situação 'Andamento' no período filtrado. Representa quantas novas medições são esperadas por mês."
+              />
               <KpiCard
                 title="Em Aberto"
                 value={fmtNum(kpis.em_aberto)}

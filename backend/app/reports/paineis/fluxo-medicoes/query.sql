@@ -144,11 +144,11 @@ tipo_contrato as (
 	where ai.cdagregador = 1
 ),
 situacao_contrato as (
-select 
+select
 skcontrato,
 s.desituacao
-from ebisfcontrato c 
-left join ebisdsituacaocontrato s on s.sksituacao = c.sksituacao 
+from siderdwh.ebisfcontrato c
+left join siderdwh.ebisdsituacaocontrato s on s.sksituacao = c.sksituacao
 ),
 empenho_contrato AS (
     SELECT
@@ -222,7 +222,9 @@ medicao AS (
         ec.vlliquido_empenho,
         xc.valor_executado,
         um.ultimo_vlevento                              AS ultimo_vlevento_contrato,
-        td_fimexec.dttempo                              AS dt_fim_execucao
+        td_fimexec.dttempo                              AS dt_fim_execucao,
+        mc.flmedicaofinal,
+        c.nutitulo
     FROM siderdwh.ebisfmedicaocontrato mc
     LEFT JOIN siderdwh.ebisdmedicaocontrato mdc    ON mdc.skmedicao = mc.skmedicao
     LEFT JOIN siderdwh.ebisdsituacaomedicao sm     ON sm.sksituacaomedicao = mc.sksituacaomedicao
@@ -339,6 +341,8 @@ SELECT
         THEN 'Insuficiente'
         ELSE 'Suficiente'
     END                                                                      AS "Saldo para Próxima Medição",
-    m.desituacao as "Situação do Contrato"
+    m.desituacao                                                             AS "Situação do Contrato",
+    m.flmedicaofinal                                                         AS "Medição Final",
+    m.nutitulo                                                               AS "NuTitulo"
 FROM medicao m
 ORDER BY 1, 2;
