@@ -68,6 +68,7 @@ export interface FluxoRow {
   dt_fim_execucao: string | null
   saldo_insuficiente: boolean
   skmedicao: number
+  nutitulo: number
   situacao_contrato: string | null
 }
 
@@ -190,6 +191,7 @@ export function mapSnapshot(raw: Record<string, unknown>[]): FluxoRow[] {
       dt_fim_execucao: r['Data Fim Execução'] ? String(r['Data Fim Execução']) : null,
       saldo_insuficiente: r['Saldo para Próxima Medição'] === 'Insuficiente',
       skmedicao: Number(r['SkMedicao'] ?? 0),
+      nutitulo: Number(r['NuTitulo'] ?? 0),
       situacao_contrato: r['Situação do Contrato'] ? String(r['Situação do Contrato']) : null,
     }
     row.dias_na_etapa = computeDias(row)
@@ -321,11 +323,9 @@ function MedicaoModal({ row, onClose }: { row: FluxoRow; onClose: () => void }) 
     enabled: !!row.skmedicao,
   })
 
-  const siderUrl = useMemo(() => {
-    const first = assinaturas.find((a) => a.nutitulo && a.nuseqmedicaoh)
-    if (!first) return null
-    return `https://sider.der.pe.gov.br/smo/editarMedicaohsmo.do?entity.qyMedicao.medicaohPK.nuSeqmedicaoh=${first.nuseqmedicaoh}&entity.qyMedicao.medicaohPK.nuTitulo=${first.nutitulo}`
-  }, [assinaturas])
+  const siderUrl = row.nutitulo && row.num_medicao
+    ? `https://sider.der.pe.gov.br/smo/editarMedicaohsmo.do?entity.qyMedicao.medicaohPK.nuSeqmedicaoh=${row.num_medicao}&entity.qyMedicao.medicaohPK.nuTitulo=${row.nutitulo}`
+    : null
 
   const validAssinaturas = assinaturas.filter((a) => a.nmpapel)
   const pendentes = validAssinaturas.filter((a) => a.nmsituacao !== 'ASSINADO')

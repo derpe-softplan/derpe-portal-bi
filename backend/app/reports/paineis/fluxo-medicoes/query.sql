@@ -144,11 +144,11 @@ tipo_contrato as (
 	where ai.cdagregador = 1
 ),
 situacao_contrato as (
-    select
-        c.skcontrato,
-        s.desituacao
-    from siderdwh.ebisfcontrato c
-    left join siderdwh.ebisdsituacaocontrato s on s.sksituacao = c.sksituacao
+select 
+skcontrato,
+s.desituacao
+from ebisfcontrato c 
+left join ebisdsituacaocontrato s on s.sksituacao = c.sksituacao 
 ),
 empenho_contrato AS (
     SELECT
@@ -339,6 +339,6 @@ SELECT
         THEN 'Insuficiente'
         ELSE 'Suficiente'
     END                                                                      AS "Saldo para Próxima Medição",
-    m.desituacao                                                               AS "Situação do Contrato"
+    m.desituacao as "Situação do Contrato"
 FROM medicao m
 ORDER BY 1, 2;

@@ -52,6 +52,32 @@ export const portalApi = {
   getReport: (slug: string) => api.get<ReportCard>(`/portal/reports/${slug}`),
   getReportData: (slug: string) =>
     api.get<Record<string, unknown>[]>(`/portal/reports/${slug}/data`),
+  downloadReport: async (slug: string, filename: string) => {
+    const response = await api.get(`/portal/reports/${slug}/download`, { responseType: 'blob' })
+    const url = URL.createObjectURL(response.data as Blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${filename}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  },
+  downloadFiltered: async (slug: string, filename: string, rows: Record<string, unknown>[]) => {
+    const response = await api.post(
+      `/portal/reports/${slug}/download`,
+      { rows },
+      { responseType: 'blob' }
+    )
+    const url = URL.createObjectURL(response.data as Blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${filename}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  },
 }
 
 // ── Cronograma ────────────────────────────────────────────────────────────────

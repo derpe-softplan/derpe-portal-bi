@@ -1,7 +1,12 @@
+import io
 import json
+import re
 from typing import Any
 
+import openpyxl
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -12,6 +17,30 @@ from app.db.session import get_db
 from app.superset.client import get_client
 
 router = APIRouter()
+
+
+class DownloadBody(BaseModel):
+    rows: list[dict[str, Any]]
+
+
+def _excel_response(title: str, rows: list[dict[str, Any]]) -> StreamingResponse:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = title[:31]
+    if rows:
+        headers = list(rows[0].keys())
+        ws.append(headers)
+        for row in rows:
+            ws.append([row.get(h) for h in headers])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    safe = re.sub(r'[^\w\- ]', '', title).strip().replace(' ', '_')
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{safe}.xlsx"'},
+    )
 
 
 async def _accessible_report_ids(user: User, db: AsyncSession) -> list[int]:
@@ -172,3 +201,54 @@ async def get_report_data(
         )
 
     return snapshot.data
+
+
+async def _get_accessible_report(
+    slug: str,
+    db: AsyncSession,
+    user: User,
+) -> Report:
+    is_admin = user.role.value in ("admin", "publisher")
+    status_filter = (
+        Report.status.in_([ReportStatus.published, ReportStatus.in_review])
+        if is_admin
+        else Report.status == ReportStatus.published
+    )
+    result = await db.execute(select(Report).where(Report.slug == slug, status_filter))
+    report = result.scalar_one_or_none()
+    if not report:
+        raise HTTPException(404, "Relatório não encontrado")
+    if not is_admin:
+        ids = await _accessible_report_ids(user, db)
+        if report.id not in ids:
+            raise HTTPException(403, "Sem permissão para este relatório")
+    return report
+
+
+@router.get("/reports/{slug}/download")
+async def download_report(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    report = await _get_accessible_report(slug, db, user)
+    snap_result = await db.execute(
+        select(ReportSnapshot).where(ReportSnapshot.report_id == report.id)
+    )
+    snapshot = snap_result.scalar_one_or_none()
+    if not snapshot or not snapshot.data:
+        raise HTTPException(404, "Dados ainda não importados.")
+    return _excel_response(report.title, snapshot.data)
+
+
+@router.post("/reports/{slug}/download")
+async def download_report_filtered(
+    slug: str,
+    body: DownloadBody,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    report = await _get_accessible_report(slug, db, user)
+    if not body.rows:
+        raise HTTPException(400, "Nenhuma linha para exportar")
+    return _excel_response(report.title, body.rows)

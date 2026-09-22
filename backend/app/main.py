@@ -80,6 +80,7 @@ async def lifespan(app: FastAPI):
                         sql_query=spec.sql,
                         refresh_schedule=spec.refresh_schedule,
                         status=ReportStatus.in_review,
+                        tipos=spec.tipos,
                     )
                     session.add(report)
                     logger.info(f"Relatório registrado: '{spec.title}'")
@@ -88,6 +89,8 @@ async def lifespan(app: FastAPI):
                     existing.description = spec.description
                     existing.sql_query = spec.sql
                     existing.panel_slug = spec.slug  # sempre reflete o nome da pasta
+                    if spec.tipos is not None:
+                        existing.tipos = spec.tipos
                     # slug e refresh_schedule não são sobrescritos — gerenciados pela UI
                     logger.info(f"Relatório sincronizado: '{spec.title}'")
                 await session.commit()
