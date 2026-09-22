@@ -143,6 +143,13 @@ tipo_contrato as (
 	left join siderdwh.ebisdagregadoritemcontrato ai on ai.skagregadoritem = ac.skagregadoritem 
 	where ai.cdagregador = 1
 ),
+situacao_contrato as (
+    select
+        c.skcontrato,
+        s.desituacao
+    from siderdwh.ebisfcontrato c
+    left join siderdwh.ebisdsituacaocontrato s on s.sksituacao = c.sksituacao
+),
 empenho_contrato AS (
     SELECT
         skcontrato,
@@ -196,6 +203,7 @@ medicao AS (
         pg.vlpago,
         pg.sktempoultimopgto,
         c.cdtitulo,
+        sc.desituacao,
         tc.deagregadoritem,
         c.deobjeto,
         c.deobjetoresumido,
@@ -244,6 +252,7 @@ medicao AS (
     LEFT JOIN executado_contrato xc             ON xc.skcontrato = mc.skcontrato
     LEFT JOIN ultima_medicao_valor um           ON um.skcontrato = mc.skcontrato
     LEFT JOIN siderdwh.ebisdtempo td_fimexec    ON td_fimexec.sktempo = NULLIF(fc.sktempofimexecucaoaditivo, 0)
+    left join situacao_contrato sc on sc.skcontrato = mc.skcontrato 
 )
 SELECT
     m.cdtitulo                                                             AS "Contrato",
@@ -299,25 +308,25 @@ SELECT
     m.vlpago                                                               AS "Valor Pago",
     m.dt_ultimo_pgto                                                       AS "Data Último Pagamento",
     CASE
+        WHEN m.flaprovada = 'S' AND COALESCE(m.vlevento, 0) = 0 THEN 'Paga integralmente'
         WHEN COALESCE(m.qt_notas, 0) = 0    THEN 'Sem nota emitida'
         WHEN COALESCE(m.vlliquidado, 0) = 0 THEN 'Nota emitida - aguardando liquidação'
         WHEN COALESCE(m.vlpago, 0) = 0      THEN 'Liquidada - aguardando pagamento'
         WHEN m.vlpago >= m.vlevento AND m.vlevento > 0 THEN 'Paga integralmente'
         ELSE 'Paga parcialmente'
-    END                                                                     AS "Status Pagamento",
+    END AS "Status Pagamento",
     CASE
+        WHEN m.flaprovada = 'S' AND COALESCE(m.vlevento, 0) = 0 THEN 'Paga integralmente'
         WHEN m.flaprovada = 'S' AND COALESCE(m.qt_faltam, 0) = 0 AND COALESCE(m.qt_notas, 0) = 0 THEN 'Finalizada - aguardando nota'
-        -- flaprovada <> 'S' cobre 'N', NULL e qualquer outro valor inesperado
         WHEN m.flaprovada IS DISTINCT FROM 'S' AND COALESCE(m.vlevento, 0) = 0  THEN 'Criada'
         WHEN m.flaprovada IS DISTINCT FROM 'S' AND COALESCE(m.vlevento, 0) <> 0 THEN 'Iniciada'
         WHEN m.flaprovada = 'S' AND COALESCE(m.qt_faltam, 0) > 0 THEN 'Assinatura pendente'
         WHEN COALESCE(m.qt_notas, 0) > 0 AND COALESCE(m.vlliquidado, 0) = 0 THEN 'Nota emitida'
         WHEN COALESCE(m.vlliquidado, 0) > 0 AND COALESCE(m.vlpago, 0) = 0 THEN 'Liquidada'
-        -- vlevento pode ser NULL (sem linha em mcc_agregado); usar COALESCE evita comparação NULL
         WHEN COALESCE(m.vlpago, 0) > 0 AND COALESCE(m.vlpago, 0) < COALESCE(m.vlevento, 0) THEN 'Paga parcialmente'
         WHEN COALESCE(m.vlpago, 0) > 0 THEN 'Paga integralmente'
         ELSE 'Criada'
-    END                                                                     AS "Etapa Atual da Jornada",
+    END AS "Etapa Atual da Jornada",
     m.dt_fim_execucao                                                        AS "Data Fim Execução",
     m.vlliquido_empenho                                                      AS "Empenho Total",
     m.valor_executado                                                        AS "Valor Executado",
@@ -329,6 +338,7 @@ SELECT
              AND COALESCE(m.ultimo_vlevento_contrato, 0) > 0
         THEN 'Insuficiente'
         ELSE 'Suficiente'
-    END                                                                      AS "Saldo para Próxima Medição"
+    END                                                                      AS "Saldo para Próxima Medição",
+    m.desituacao                                                               AS "Situação do Contrato"
 FROM medicao m
 ORDER BY 1, 2;

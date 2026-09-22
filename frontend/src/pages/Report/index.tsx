@@ -24,7 +24,7 @@ export default function ReportPage() {
     queryKey: ['report-data', slug],
     queryFn: () => portalApi.getReportData(slug!).then((r) => r.data),
     enabled: !!slug,
-    staleTime: Infinity,
+    staleTime: 5 * 60 * 1000,
   })
 
   return (

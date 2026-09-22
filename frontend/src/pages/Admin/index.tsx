@@ -769,6 +769,12 @@ function ReportsTab() {
       await adminApi.reports.refresh(id)
       qc.invalidateQueries({ queryKey: ['admin-reports'] })
       qc.invalidateQueries({ queryKey: ['refresh-logs', id] })
+      // Invalida o cache dos dados e meta do relatório para forçar refetch automático
+      const slug = reports.find((r) => r.id === id)?.slug
+      if (slug) {
+        qc.invalidateQueries({ queryKey: ['report-data', slug] })
+        qc.invalidateQueries({ queryKey: ['report-meta', slug] })
+      }
     } finally {
       setRefreshingId(null)
     }

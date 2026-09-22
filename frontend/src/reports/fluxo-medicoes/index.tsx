@@ -71,6 +71,19 @@ export interface FluxoRow {
   dt_fim_execucao: string | null
   saldo_insuficiente: boolean
   skmedicao: number
+  situacao_contrato: string | null
+}
+
+export interface PendenteCriacao {
+  contrato: string
+  empresa: string
+  rodovias: string
+  municipios: string
+  distrito: string
+  natureza: string
+  tipo_contrato: string | null
+  mes_ano: string
+  dt_fim_execucao: string | null
 }
 
 // ── Mapeamento snapshot → FluxoRow ────────────────────────────────────────────
@@ -180,6 +193,7 @@ export function mapSnapshot(raw: Record<string, unknown>[]): FluxoRow[] {
       dt_fim_execucao: r['Data Fim Execução'] ? String(r['Data Fim Execução']) : null,
       saldo_insuficiente: r['Saldo para Próxima Medição'] === 'Insuficiente',
       skmedicao: Number(r['SkMedicao'] ?? 0),
+      situacao_contrato: r['Situação do Contrato'] ? String(r['Situação do Contrato']) : null,
     }
     row.dias_na_etapa = computeDias(row)
     return row
@@ -688,6 +702,76 @@ function DrillModal({
   )
 }
 
+// ── Pendentes de Criação ─────────────────────────────────────────────────────
+
+function PendentesCriacaoSection({ pendentes }: { pendentes: PendenteCriacao[] }) {
+  const [open, setOpen] = useState(false)
+
+  if (pendentes.length === 0) return null
+
+  const byContract = new Map<string, PendenteCriacao[]>()
+  for (const p of pendentes) {
+    if (!byContract.has(p.contrato)) byContract.set(p.contrato, [])
+    byContract.get(p.contrato)!.push(p)
+  }
+
+  return (
+    <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-amber-100/60 dark:hover:bg-amber-900/20 transition-colors"
+      >
+        <AlertTriangle size={14} className="text-amber-500 flex-shrink-0" />
+        <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">Pendentes de criação</h3>
+        <span className="text-xs bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-full font-semibold ml-1">
+          {pendentes.length} em {byContract.size} {byContract.size === 1 ? 'contrato' : 'contratos'}
+        </span>
+        <span className="ml-auto text-amber-500">
+          {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        </span>
+      </button>
+
+      {open && (
+        <div className="border-t border-amber-200 dark:border-amber-800 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide border-b border-amber-200 dark:border-amber-800">
+                <th className="text-left px-4 py-2">Contrato</th>
+                <th className="text-left px-4 py-2">Empresa</th>
+                <th className="text-left px-4 py-2 hidden sm:table-cell">Distrito</th>
+                <th className="text-left px-4 py-2 hidden md:table-cell">Rodovias</th>
+                <th className="text-left px-4 py-2">Competências faltantes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from(byContract.entries()).map(([contrato, items]) => (
+                <tr key={contrato} className="border-b border-amber-100 dark:border-amber-900/40 last:border-0 hover:bg-amber-100/60 dark:hover:bg-amber-900/20">
+                  <td className="px-4 py-2.5 font-mono font-semibold text-xs text-gray-800 dark:text-gray-200 whitespace-nowrap">{contrato}</td>
+                  <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300 max-w-[180px] truncate">{items[0].empresa}</td>
+                  <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400 hidden sm:table-cell whitespace-nowrap">{items[0].distrito}</td>
+                  <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400 hidden md:table-cell">{items[0].rodovias}</td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex flex-wrap gap-1">
+                      {items.map((i) => (
+                        <span
+                          key={i.mes_ano}
+                          className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 whitespace-nowrap"
+                        >
+                          {i.mes_ano}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Jornada Completa ──────────────────────────────────────────────────────────
 
 function FunilCompleto({
@@ -695,11 +779,13 @@ function FunilCompleto({
   activeEtapa,
   onEtapaClick,
   onRowClick,
+  pendentesCriacao,
 }: {
   data: FluxoRow[]
   activeEtapa: string | null
   onEtapaClick: (etapa: string | null) => void
   onRowClick?: (row: FluxoRow) => void
+  pendentesCriacao?: PendenteCriacao[]
 }) {
   const { data: cronogramaRaw = {} } = useQuery({
     queryKey: ['cronograma'],
@@ -799,6 +885,16 @@ function FunilCompleto({
 
                 {/* Valor financeiro */}
                 <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{brl(item.valor)}</div>
+
+                {/* Pendentes de criação (só no card Criada) */}
+                {item.etapa === 'Criada' && (pendentesCriacao?.length ?? 0) > 0 && (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <AlertTriangle size={11} className="text-amber-500 flex-shrink-0" />
+                    <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                      {pendentesCriacao!.length} a criar
+                    </span>
+                  </div>
+                )}
 
                 {/* Comparação com cronograma */}
                 {expected !== undefined && (
@@ -2296,6 +2392,100 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     competenciaAte,
   ])
 
+  // Medições que deveriam estar criadas e não estão (contratos em andamento)
+  const medicoesPendentes = useMemo((): PendenteCriacao[] => {
+    const today = new Date()
+    const curYear = today.getFullYear()
+    const curMonth = today.getMonth() + 1
+
+    const prevMonth = curMonth === 1 ? 12 : curMonth - 1
+    const prevYear = curMonth === 1 ? curYear - 1 : curYear
+
+    // Aplicar apenas filtros de dimensão (não competência) para não cortar a última competência real
+    const dimFiltered = rows.filter((r) => {
+      if (empresa.length > 0 && !empresa.includes(r.empresa)) return false
+      if (contrato.length > 0 && !contrato.includes(r.contrato)) return false
+      if (rodovia.length > 0) {
+        const rr = (r.rodovias || '').split(',').map((v) => v.trim())
+        if (!rodovia.some((v) => (v === '(sem info)' ? !rr.filter(Boolean).length : rr.includes(v)))) return false
+      }
+      if (tipoContrato.length > 0 && !tipoContrato.includes(r.tipo_contrato ?? '')) return false
+      if (municipio.length > 0) {
+        const rm = (r.municipios || '').split(',').map((v) => v.trim())
+        if (!municipio.some((v) => (v === '(sem info)' ? !rm.filter(Boolean).length : rm.includes(v)))) return false
+      }
+      if (distritoFiltro.length > 0 && !distritoFiltro.includes(r.distrito)) return false
+      return true
+    })
+
+    const byContract = new Map<string, FluxoRow[]>()
+    for (const r of dimFiltered) {
+      if (!byContract.has(r.contrato)) byContract.set(r.contrato, [])
+      byContract.get(r.contrato)!.push(r)
+    }
+
+    const pendentes: PendenteCriacao[] = []
+
+    for (const [, contratoRows] of byContract) {
+      const sample = contratoRows[0]
+
+      // Só contratos em andamento
+      if (sample.situacao_contrato !== 'Andamento') continue
+
+      const existingComps = new Set<string>()
+      for (const r of contratoRows) {
+        if (r.mes_ano) existingComps.add(r.mes_ano)
+      }
+
+      // Última competência do contrato
+      let maxComp: { year: number; month: number } | null = null
+      for (const comp of existingComps) {
+        const parsed = parseMesAno(comp)
+        if (!parsed) continue
+        if (!maxComp || parsed.year > maxComp.year || (parsed.year === maxComp.year && parsed.month > maxComp.month)) {
+          maxComp = parsed
+        }
+      }
+      if (!maxComp) continue
+
+      // Já está em dia
+      if (maxComp.year > prevYear || (maxComp.year === prevYear && maxComp.month >= prevMonth)) continue
+
+      // Enumerar meses faltantes
+      let chy = maxComp.year
+      let chm = maxComp.month + 1
+      if (chm > 12) { chy++; chm = 1 }
+
+      while (chy < prevYear || (chy === prevYear && chm <= prevMonth)) {
+        const compStr = `${String(chm).padStart(2, '0')}/${chy}`
+        if (!existingComps.has(compStr)) {
+          pendentes.push({
+            contrato: sample.contrato,
+            empresa: sample.empresa,
+            rodovias: sample.rodovias,
+            municipios: sample.municipios,
+            distrito: sample.distrito,
+            natureza: sample.natureza,
+            tipo_contrato: sample.tipo_contrato,
+            mes_ano: compStr,
+            dt_fim_execucao: sample.dt_fim_execucao,
+          })
+        }
+        chm++
+        if (chm > 12) { chy++; chm = 1 }
+      }
+    }
+
+    return pendentes.sort((a, b) => {
+      const cc = a.contrato.localeCompare(b.contrato)
+      if (cc !== 0) return cc
+      const pa = parseMesAno(a.mes_ano)
+      const pb = parseMesAno(b.mes_ano)
+      if (!pa || !pb) return 0
+      return pa.year !== pb.year ? pa.year - pb.year : pa.month - pb.month
+    })
+  }, [rows, empresa, contrato, rodovia, tipoContrato, municipio, distritoFiltro])
+
   // Com etapa (para tabela)
   const filtered = useMemo(() => {
     if (!etapaFiltro) return filteredBase
@@ -2728,6 +2918,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
                 activeEtapa={etapaFiltro}
                 onEtapaClick={handleEtapa}
                 onRowClick={setSelectedRow}
+                pendentesCriacao={medicoesPendentes}
               />
             </div>
 
@@ -2852,6 +3043,9 @@ export function FluxoMedicoes({ data: rawData }: Props) {
                 )}
               </div>
             </div>
+            {etapaFiltro === 'Criada' && (
+              <PendentesCriacaoSection pendentes={medicoesPendentes} />
+            )}
             <FluxoTable
               data={filtered}
               localSearch={localSearch}
