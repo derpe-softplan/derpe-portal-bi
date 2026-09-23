@@ -1,4 +1,4 @@
-# Portal BI DER-PE — Guia do Desenvolvedor
+# Portal BI do DER-PE — Guia do Desenvolvedor
 
 **Público-alvo:** Desenvolvedor responsável por manter, estender ou criar novos painéis no portal. Leia o `OVERVIEW.md` antes para entender o contexto do sistema.
 
@@ -41,7 +41,7 @@
 ### Pré-requisitos
 
 - Docker Desktop instalado e rodando
-- Acesso à rede da DER-PE (VPN ou presencial) — o backend precisa alcançar o Superset para atualizar dados
+- Acesso à rede da Softplan (presencial ou VPN) — o Superset e o DWH estão no ambiente da Softplan e não são acessíveis de fora
 - Node.js 20+ (somente para build do frontend fora do Docker)
 
 ### Configuração inicial
@@ -640,9 +640,9 @@ Para tarefas recorrentes (ex: sempre escrever queries DWH, ou sempre criar pain�
 
 ```markdown
 <!-- .claude/agents/dwh-query.md -->
-# Agente: Consultor DWH DER-PE
+# Agente: Consultor DWH do DER-PE
 
-Você é especialista em escrever queries SQL para o schema siderdwh da DER-PE.
+Você é especialista em escrever queries SQL para o schema siderdwh do DER-PE.
 
 ## Regras obrigatórias
 - Sempre filtrar `flactive = 'S'` em tabelas que tenham essa coluna
@@ -660,9 +660,9 @@ Você é especialista em escrever queries SQL para o schema siderdwh da DER-PE.
 
 ```markdown
 <!-- .claude/agents/novo-painel.md -->
-# Agente: Criador de Painéis DER-PE
+# Agente: Criador de Painéis do DER-PE
 
-Você cria componentes React para o Portal BI da DER-PE.
+Você cria componentes React para o Portal BI do DER-PE.
 
 ## Localização dos arquivos
 - Componente: frontend/src/reports/<slug>/index.tsx

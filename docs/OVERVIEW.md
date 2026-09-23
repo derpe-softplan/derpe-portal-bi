@@ -1,21 +1,24 @@
-# Portal BI DER-PE — Visão Geral do Sistema
+# Portal BI do DER-PE — Visão Geral do Sistema
 
 **Público-alvo:** Qualquer pessoa nova na equipe que precisa entender como o sistema funciona, de onde vêm os dados e onde tudo está hospedado — sem precisar ler código.
+
+> **Contexto:** Somos da Softplan, empresa de software responsável pelo SIDER, prestando suporte e BI ao **DER-PE** (Departamento de Estradas de Rodagem de Pernambuco). Este documento é escrito para a equipe Softplan envolvida nesse contrato.
 
 ---
 
 ## 1. O que é o Portal BI
 
-O **Portal BI** é uma aplicação web interna da **DER-PE** (Departamento de Estradas de Rodagem de Pernambuco) que centraliza relatórios e painéis de acompanhamento de **contratos, medições e pagamentos** de obras rodoviárias.
+O **Portal BI** é uma aplicação web desenvolvida para o **DER-PE** que consolida todos os relatórios e painéis de dados provenientes do SIDER em um único lugar — sem licenciamento adicional, acessível de qualquer dispositivo (incluindo celular) e sem a necessidade de estar dentro do sistema.
 
-Antes do portal, informações sobre o andamento de medições precisavam ser extraídas manualmente do sistema de gestão ou consultadas diretamente no banco de dados — processo lento e sujeito a erros. O portal automatiza esse ciclo: coleta dados do sistema de produção, armazena snapshots otimizados e os exibe em painéis interativos.
+Antes do portal, os usuários precisavam acessar o SIDER diretamente ou consultar relatórios no Superset — ferramenta técnica da Softplan, não pensada para uso operacional direto pelo cliente. O portal resolve isso: qualquer usuário do DER-PE com autorização da diretoria passa a ter acesso a uma interface simples e focada nos dados do seu setor.
+
+A ideia é que o portal abranja **todos os módulos do SIDER** à medida que novas demandas surgirem — hoje o foco está em contratos e medições, mas a arquitetura não é limitada a isso.
 
 **Quem usa:**
 | Perfil | O que faz no portal |
 |---|---|
-| Gestores de contrato | Acompanham andamento de medições e pagamentos |
-| Fiscais de campo | Consultam status de assinaturas e etapas da jornada |
-| Administradores | Gerenciam usuários, publicam relatórios, monitoram atualizações |
+| Usuários e gestores de setores do DER-PE | Consultam relatórios e painéis dos dados do SIDER pertinentes ao seu setor |
+| Administradores (equipe Softplan/BI) | Gerenciam usuários, publicam relatórios, monitoram atualizações de dados |
 
 ---
 
@@ -25,25 +28,25 @@ Os dados percorrem quatro camadas antes de aparecerem no portal:
 
 ```mermaid
 flowchart LR
-    A[("SIDER\nSistema de Produção\nPostgreSQL")] -->|"ETL periódico\n(processo separado)"| B[("DWH\nsiderdwh\nPostgreSQL")]
-    B --- C["Apache Superset\nsider.der.pe.gov.br/analytics"]
+    A[("SIDER\nSistema de Produção\nOracle")] -->|"ETL periódico\n(processo separado)"| B[("DWH\nsiderdwh\nPostgreSQL")]
+    B --- C["Apache Superset\n(ambiente Softplan)"]
     C -->|"SQL API\n(HTTPS)"| D["Backend\nFastAPI"]
     D --> E["Portal\n(Navegador)"]
 ```
 
 ### SIDER — Sistema de Produção
 
-O **SIDER** é o sistema de gestão operacional da DER-PE. É onde tudo nasce: contratos firmados, medições lançadas, assinaturas registradas, notas fiscais emitidas. Roda em banco PostgreSQL dentro da rede interna da DER-PE.
+O **SIDER** é o sistema ERP da Softplan utilizado pelo DER-PE para gestão de todos os seus processos — contratos, medições, patrimônio, financeiro e outros módulos. O banco de dados de produção é **Oracle**, hospedado no ambiente da Softplan. É a fonte primária de todos os dados que chegam ao portal.
 
 ### ETL — Extração e Carga no DWH
 
-Um processo ETL (Extract, Transform, Load) roda periodicamente e extrai dados do SIDER, aplica transformações e os carrega no DWH (Data Warehouse). Esse processo é **gerenciado em repositório separado** — qualquer problema com a origem dos dados ou com colunas faltando começa aqui.
+Um processo ETL (Extract, Transform, Load) roda periodicamente, extrai dados do banco Oracle do SIDER, aplica transformações e os carrega no DWH. Esse processo é **gerenciado em repositório separado** — qualquer problema com a origem dos dados ou colunas faltando começa aqui.
 
 > O código do ETL está em repositório GitLab dedicado, mantido pela equipe de BI da Softplan.
 
 ### DWH — Data Warehouse (`siderdwh`)
 
-O DWH é um banco PostgreSQL analítico com schema `siderdwh`. Organizado no modelo **fato-dimensão**:
+O DWH é um banco **PostgreSQL** analítico com schema `siderdwh`, também no ambiente da Softplan. Organizado no modelo **fato-dimensão**:
 
 | Prefixo | Tipo | Exemplo | Contém |
 |---|---|---|---|
@@ -54,9 +57,9 @@ O portal **nunca escreve no DWH** — acesso é somente-leitura via Superset.
 
 ### Apache Superset — Gateway de Acesso ao DWH
 
-O [Superset](https://sider.der.pe.gov.br/analytics) é a ferramenta de BI da DER-PE que o portal usa como **gateway** para o DWH. O backend autentica-se no Superset como usuário de serviço e envia queries SQL via a API interna do Superset (`POST /superset/sql_json/`).
+O Superset é a ferramenta de BI da Softplan, publicada na web e acessível via usuário e senha. O DWH (`siderdwh`) está no mesmo ambiente da Softplan e só é acessível a partir daí — o portal não tem conexão direta com o PostgreSQL do DWH. Por isso, o backend autentica-se no Superset como usuário de serviço e envia queries SQL via a API interna (`POST /superset/sql_json/`), que executa no DWH e retorna os resultados.
 
-> **Por que usar o Superset como intermediário?** O banco do DWH só é acessível através do Superset dentro da infraestrutura da DER-PE. O portal não tem acesso direto ao PostgreSQL do DWH — essa camada de indireção é intencional.
+> **Em desenvolvimento:** o acesso ao Superset requer estar na rede da Softplan (ou VPN), pois o DWH que o Superset consulta não é acessível de fora desse ambiente.
 
 ---
 
@@ -73,10 +76,10 @@ graph TB
         REDIS[("Redis 7\nCache de queries\ndo DWH")]
     end
 
-    subgraph DERPE["🏢 Rede Interna DER-PE"]
-        SUPERSET["Apache Superset\nsider.der.pe.gov.br/analytics"]
-        DWH[("DWH\nsiderdwh")]
-        SIDER[("SIDER\nProdução")]
+    subgraph SOFTPLAN["☁️ Ambiente Softplan"]
+        SUPERSET["Apache Superset\n(web, acesso por usuário/senha)"]
+        DWH[("DWH\nsiderdwh\nPostgreSQL")]
+        SIDER[("SIDER\nProdução\nOracle")]
         ETL["Processo ETL"]
     end
 
@@ -91,10 +94,10 @@ graph TB
     ETL --> DWH
 ```
 
-**Conectividade OCI ↔ DER-PE:**
-- O backend conecta-se ao Superset via HTTPS pela internet pública
+**Conectividade OCI ↔ Ambiente Softplan:**
+- O backend conecta-se ao Superset via HTTPS — o Superset é acessível na web com usuário e senha
 - O IP do Superset (`136.248.126.29`) é resolvido via `extra_hosts` no Docker Compose
-- Em desenvolvimento, os DNS internos da DER-PE (`192.168.100.x`) são configurados nos contêineres para resolução de nomes internos
+- Em desenvolvimento, os contêineres usam os DNS internos da Softplan (`192.168.100.x`) para resolução de nomes do ambiente
 
 ---
 
@@ -111,7 +114,7 @@ sequenceDiagram
     participant Backend as Backend FastAPI
     participant Snapshot as report_snapshots (PostgreSQL)
 
-    SIDER->>ETL: Dados de contratos,<br/>medições, assinaturas
+    SIDER->>ETL: Dados dos módulos do SIDER<br/>(Oracle → ETL)
     ETL->>DWH: INSERT/UPDATE — carga periódica
 
     Note over Backend,Snapshot: Acionado por scheduler automático ou Admin manualmente
@@ -184,7 +187,7 @@ sequenceDiagram
 | Backend (FastAPI) | Porta 8000 (interna) | Idem |
 | PostgreSQL | Porta 5432 (interna) | Idem, volume persistente |
 | Redis | Porta 6379 (interna) | Idem |
-| DWH / Superset | `sider.der.pe.gov.br` (rede DER-PE) | Idem — externo ao portal |
+| DWH / Superset | Ambiente Softplan (acesso via VPN ou rede interna) | Idem — externo ao portal |
 
 **OCI Free Tier:**
 - Instância ARM Ampere A1 — **4 OCPUs e 24 GB de RAM gratuitos**

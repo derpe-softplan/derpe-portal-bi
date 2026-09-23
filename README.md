@@ -1,6 +1,6 @@
 # Portal BI — DER-PE
 
-Portal de Business Intelligence interno do Departamento de Estradas de Rodagem de Pernambuco. Centraliza relatórios e painéis de acompanhamento de contratos, medições e pagamentos, consumindo dados do DWH via Apache Superset.
+Portal de Business Intelligence desenvolvido para o Departamento de Estradas de Rodagem de Pernambuco. Consolida relatórios e painéis de dados do SIDER em uma interface acessível sem licenciamento adicional, disponível de qualquer dispositivo, sem precisar acessar o sistema diretamente.
 
 **Stack:** Python 3.12 · FastAPI · React 18 · TypeScript · PostgreSQL · Redis · Docker Compose
 
