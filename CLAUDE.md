@@ -1,12 +1,14 @@
-# DER-PE Portal BI — Diretrizes do Projeto
+# Portal BI do DER-PE — Diretrizes do Projeto
 
 Este arquivo define os padrões e convenções do projeto. Leia-o integralmente antes de qualquer alteração.
+
+> **Contexto:** Somos da Softplan, prestando suporte e BI ao DER-PE (Departamento de Estradas de Rodagem de Pernambuco). O SIDER é o ERP da Softplan utilizado pelo DER-PE. O Superset e o DWH estão no ambiente da Softplan, acessíveis via rede/VPN interna.
 
 ---
 
 ## Visão geral
 
-Portal BI interno da DER-PE (Departamento de Estradas de Rodagem de Pernambuco). Centraliza relatórios e painéis de acompanhamento de contratos, medições e pagamentos. Consome dados do DWH via Apache Superset.
+Portal BI desenvolvido para o DER-PE que consolida relatórios e painéis de dados do SIDER — todos os módulos, não apenas contratos e medições. Consome dados do DWH (`siderdwh`) via Apache Superset.
 
 ---
 
@@ -32,23 +34,28 @@ portal/
 │       ├── auth/          # login, sessão, deps de autenticação
 │       ├── admin/         # router.py — CRUD de usuários, grupos, relatórios, permissões
 │       ├── portal/        # router.py — endpoints públicos (portal, medições, cronograma)
-│       ├── reports/       # catálogo de relatórios (um diretório por relatório)
-│       │   └── <slug>/
-│       │       ├── meta.json   # title, description, refresh_schedule
-│       │       └── query.sql   # SQL que gera o snapshot
+│       ├── reports/       # catálogo de relatórios
+│       │   └── <secao>/   # ex: extracoes/, paineis/
+│       │       └── <slug>/
+│       │           ├── meta.json   # title, description, refresh_schedule, tipos
+│       │           └── query.sql   # SQL que gera o snapshot
 │       ├── db/            # models.py, session.py, migrations
 │       ├── superset/      # client.py — acesso ao DWH via Superset SQL API
 │       ├── config.py      # settings via .env
 │       └── main.py        # startup, lifespan, routers
 └── frontend/
     └── src/
-        ├── panels/        # painéis customizados (ex.: FluxoMedicoes)
-        ├── reports/       # páginas de relatório por slug
+        ├── reports/       # componentes de painel por slug
+        │   └── <slug>/
+        │       ├── index.tsx      # export { Panel } — componente principal
+        │       └── Thumbnail.tsx  # export { Thumbnail } — miniatura opcional
+        ├── panels/        # apenas registry.ts (auto-discover via import.meta.glob)
+        ├── components/    # componentes reutilizáveis (KpiCard, EChart, ComboBox…)
         ├── services/
         │   └── api.ts     # toda a camada HTTP (axios + tipos TypeScript)
-        ├── layouts/       # PortalLayout, AdminLayout
+        ├── layouts/       # PortalLayout
         ├── pages/         # páginas do React Router
-        └── context/       # AuthContext
+        └── context/       # AuthContext, ThemeContext
 ```
 
 ---
@@ -113,6 +120,14 @@ npx vite build        # gera dist/ — nginx serve daqui
 - Cores de governo: classes `bg-gov-blue`, `bg-gov-blue-dark`, `text-gov-yellow` (definidas no `tailwind.config`).
 - Etapas da jornada de medição têm ordem fixa em `ETAPAS_ORDER`; nunca reordenar sem atualizar o array.
 
+### Painéis customizados
+
+- Cada painel fica em `frontend/src/reports/<slug>/index.tsx` — exportar função **nomeada** `Panel` (nunca `default export`).
+- Thumbnail opcional em `frontend/src/reports/<slug>/Thumbnail.tsx` — exportar função nomeada `Thumbnail`.
+- Props do Panel: `{ data: Row[] }` onde `Row` é uma interface tipada com as colunas exatas da query.
+- O `registry.ts` usa `import.meta.glob` — **não editá-lo**. O painel é descoberto automaticamente ao criar o arquivo no caminho correto.
+- Para detalhes de visuais e templates, use o agente `.claude/agents/novo-painel.md`.
+
 ---
 
 ## Papéis de usuário
@@ -141,7 +156,7 @@ Definidas em `.env` na raiz de `backend/`. Nunca commitar `.env`. Principais:
 O arquivo `docker-compose.prod.yml` sobrepõe o compose de dev para produção:
 - Remove os volume mounts de código local (usa as imagens buildadas)
 - Expõe a porta 80 em vez de 8081
-- Remove os DNS internos da DER-PE (usa 8.8.8.8 + `extra_hosts` para o DWH)
+- Remove os DNS internos da Softplan (usa 8.8.8.8 + `extra_hosts` para o Superset)
 
 ### Pré-requisitos na instância OCI
 1. Docker instalado (`curl -fsSL https://get.docker.com | sudo sh`)

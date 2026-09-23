@@ -25,5 +25,6 @@ Thumbs.db
 .vscode/
 *.swp
 
-# Claude Code
-.claude/
+# Claude Code — ignorar configurações locais, mas trackear agentes do projeto
+.claude/*
+!.claude/agents/
