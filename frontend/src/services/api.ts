@@ -91,6 +91,11 @@ export const cronogramaApi = {
 export const medicaoApi = {
   getAssinaturas: (skmedicao: string) =>
     api.get<MedicaoAssinatura[]>(`/portal/medicoes/${skmedicao}/assinaturas`),
+  getEsperadas: (mesInicio: string, mesFim: string, nutitulos: number[]) =>
+    api.get<{ total_esperado: number; por_mes: { mes: string; qtd: number }[] }>(
+      '/portal/medicoes/esperadas',
+      { params: { mes_inicio: mesInicio, mes_fim: mesFim, nutitulos } }
+    ),
 }
 
 // ── Admin ─────────────────────────────────────────────────────────────────────

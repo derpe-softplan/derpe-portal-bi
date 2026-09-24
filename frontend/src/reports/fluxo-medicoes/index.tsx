@@ -2602,6 +2602,28 @@ export function FluxoMedicoes({ data: rawData }: Props) {
     return seen.size
   }, [filteredBase])
 
+  const nutitulosNoFiltro = useMemo(
+    () => [...new Set(filteredBase.map((r) => r.nutitulo).filter((n) => n > 0))],
+    [filteredBase]
+  )
+
+  const { data: esperadasData, isLoading: esperadasLoading } = useQuery({
+    queryKey: ['medicoes-esperadas', competenciaDe, competenciaAte, nutitulosNoFiltro],
+    queryFn: () =>
+      medicaoApi
+        .getEsperadas(competenciaDe, competenciaAte, nutitulosNoFiltro)
+        .then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!competenciaDe && !!competenciaAte,
+  })
+
+  const totalEsperado = esperadasData?.total_esperado ?? 0
+
+  const totalAprovadas = useMemo(
+    () => filteredBase.filter((r) => r.etapa_jornada !== 'Criada' && r.etapa_jornada !== 'Iniciada').length,
+    [filteredBase]
+  )
+
   function dimItems(key: (r: FluxoRow) => string): DimItem[] {
     const acc: Record<string, { valor: number; quantidade: number }> = {}
     for (const r of naoPagasRows) {
@@ -2877,7 +2899,7 @@ export function FluxoMedicoes({ data: rawData }: Props) {
 
         {activePage === 'resumo' && (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               <KpiCard
                 title="Em Andamento"
                 value={fmtNum(contratosAndamento)}
@@ -2929,6 +2951,19 @@ export function FluxoMedicoes({ data: rawData }: Props) {
                   alertasKpis.vencendo_60d ? () => setShowVencendoModal(true) : undefined
                 }
                 tooltip="Contratos com data fim de execução nos próximos 60 dias."
+              />
+              <KpiCard
+                title="Aprovadas / Esperadas"
+                value={esperadasLoading ? '…' : `${fmtNum(totalAprovadas)} / ${fmtNum(totalEsperado)}`}
+                subtitle={
+                  !esperadasLoading && totalEsperado > 0
+                    ? `${Math.round((totalAprovadas / totalEsperado) * 100)}% no período`
+                    : 'no período selecionado'
+                }
+                icon={<CheckCircle2 size={18} />}
+                accent="teal"
+                loading={esperadasLoading}
+                tooltip="Medições aprovadas (flaprovada = S) versus o total esperado com base nos contratos em situação Andamento mês a mês."
               />
             </div>
 

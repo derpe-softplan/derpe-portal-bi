@@ -1,10 +1,11 @@
 import io
 import json
 import re
+from datetime import datetime
 from typing import Any
 
 import openpyxl
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import or_, select, text
@@ -114,6 +115,77 @@ WHERE a.skmedicao = {mid}"""
 
     rows = await get_client().query(sql)
     return rows
+
+
+@router.get("/medicoes/esperadas")
+async def get_medicoes_esperadas(
+    mes_inicio: str,
+    mes_fim: str,
+    nutitulos: list[int] = Query(default=[]),
+    _user: User = Depends(get_current_user),
+):
+    try:
+        dt_inicio = datetime.strptime(mes_inicio, "%Y-%m").date()
+        dt_fim = datetime.strptime(mes_fim, "%Y-%m").date()
+    except ValueError:
+        raise HTTPException(422, "Formato inválido. Use YYYY-MM.") from None
+
+    if dt_fim < dt_inicio:
+        return {"total_esperado": 0, "por_mes": []}
+
+    nutitulos_filter = ""
+    if nutitulos:
+        ids = [int(n) for n in nutitulos if int(n) > 0]
+        if ids:
+            ids_str = ",".join(str(i) for i in ids)
+            nutitulos_filter = f"AND c.nutitulo IN ({ids_str})"
+
+    sql = f"""
+    WITH situacoes AS (
+        SELECT
+            cs.skcontrato,
+            cs.sksituacao,
+            cs.cdseqsituacao,
+            td.dttempo::date AS dt_situacao
+        FROM siderdwh.ebisfcontratosituacao cs
+        JOIN siderdwh.ebisdtempo td ON td.sktempo = NULLIF(cs.sktemposituacao, 0)
+        JOIN siderdwh.ebisdcontrato c ON c.skcontrato = cs.skcontrato
+        WHERE c.flactive = 'S'
+        {nutitulos_filter}
+    ),
+    situacoes_range AS (
+        SELECT
+            skcontrato,
+            sksituacao,
+            dt_situacao AS dt_inicio,
+            LEAD(dt_situacao) OVER (
+                PARTITION BY skcontrato
+                ORDER BY dt_situacao, cdseqsituacao
+            ) AS dt_fim
+        FROM situacoes
+    ),
+    meses AS (
+        SELECT generate_series(
+            DATE_TRUNC('month', '{dt_inicio}'::date),
+            DATE_TRUNC('month', '{dt_fim}'::date),
+            '1 month'::interval
+        )::date AS mes
+    )
+    SELECT
+        TO_CHAR(m.mes, 'MM/YYYY') AS mes,
+        COUNT(DISTINCT s.skcontrato)::int AS qtd
+    FROM meses m
+    JOIN situacoes_range s ON
+        s.sksituacao = 1
+        AND s.dt_inicio <= (m.mes + INTERVAL '1 month - 1 day')::date
+        AND (s.dt_fim IS NULL OR s.dt_fim > m.mes)
+    GROUP BY m.mes
+    ORDER BY m.mes
+    """
+
+    rows = await get_client().query(sql)
+    total = sum(r["qtd"] for r in rows)
+    return {"total_esperado": total, "por_mes": rows}
 
 
 @router.get("/reports")
